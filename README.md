@@ -20,9 +20,10 @@ create your database instance, and provide some secrets through dot-env
 files and the like. To avoid excessive infrastructure overhead, some
 components will be mocked with local (non-production) equivalents.
 
-Now to the setup: _TODO_.
-
-- Add the repo's root to the Python path for your virtual env
+- Create a Python 3.8+ virtualenv and `pip install -r requirements.txt` into it.
+- Add the repo's root to the Pythonpath of the virtualenv
+- **TEMP** Take care of installing a certain commit of Feast in development mode, see instructions in `requirements.txt`
+- Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values
 
 ## The story
 
