@@ -125,7 +125,9 @@ here's what you do:
 
 - start `jupyter notebook`
 - locate `training/model1_2019/train_model_1_2019.ipynb`
-- run it all the way to storing the trained model.
+- run it all the way to storing the trained model. 
+
+> **Note**: the details of the (rather sketchy) training process are not the focus of this story and will not be examined particularly.
 
 The notebook accesses the Feast store and uses it to retrieve, from offline
 storage, the training data. To do so, the join on `sms_id` is done behind
@@ -134,10 +136,18 @@ a date, to ensure we retrieve historically-consistent data ("as if time was
 frozen on that day").
 
 Once the data is transformed and the model is trained,
-it is stored to a file for later usage. _TODO_.
+it is saved (using `joblib`) to file `models/model1_2019/model1.pkl`
+for later usage.
 
 > In a production environment, the model would be stored e.g. on cloud object
 > storage; moreover, if the feature registry were not just a local SQLite, this
 > part of the story could well be played on another machine, provided this
 > repo is there with all secrets set up.
 
+#### Serving the model in production (2019)
+
+TODO:
+
+- an app with a simple users-sms-text backing table, via API
+- an API exposing the model (versioned url paths)
+- a simple react frontend to demo this
