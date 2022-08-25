@@ -54,9 +54,12 @@ The extraction of the features from the text is conveniently packed
 in function `get_features1` of `analysis/features1/feature_extractor`.
 
 ```
-from analysis.features1.feature_extractor import get_features1
-get_features1('You are A WINNER OF FREE CASH!!!!!!!')
-# {'cap_r': 0.782608695652174, 'nal_r': 0.30434782608695654, 'cw_scores': [1, 0, 0, 0, 0, 1, 1]}
+from analysis.features1.feature1_extractor import Feature1Extractor
+sample_text = 'You are A WINNER OF FREE CASH!!!!!!!'
+f1_extractor = Feature1Extractor()
+print(f1_extractor.get_features(sample_text))
+print(f1_extractor.get_feature_names())
+print(f1_extractor.get_features_list(sample_text))
 ```
 
 #### Offline repository for features 1
@@ -146,6 +149,13 @@ for later usage.
 > repo is there with all secrets set up.
 
 #### Serving the model in production (2019)
+
+A first API "v1" able to process text as well as a featurelist,
+subjecting it to the model.
+Also it handles feature extraction.
+
+A second API doing the menial work of "ordinarily serving the app"
+
 
 TODO:
 
