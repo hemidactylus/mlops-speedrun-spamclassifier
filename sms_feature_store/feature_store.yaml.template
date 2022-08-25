@@ -1,0 +1,14 @@
+project: sms_spam_store
+registry: data/registry.db
+provider: local
+online_store:
+    type: cassandra
+    secure_bundle_path: BUNDLE_PATH
+    username: TOKEN_CLIENT_ID
+    password: TOKEN_CLIENT_SECRET
+    keyspace: KEYSPACE_NAME
+    protocol_version: 4
+    load_balancing:
+        local_dc: DB_REGION_NAME
+        load_balancing_policy: TokenAwarePolicy(DCAwareRoundRobinPolicy)
+entity_key_serialization_version: 2

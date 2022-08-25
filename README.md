@@ -34,9 +34,8 @@ Our data engineers have collected a labeled set with three columns:
 `sms_id`, `text` and `label`, the latter being simply `spam/ham`. This is in
 `raw_data/raw_dataset.csv`.
 
-> This dataset could realistically be stored on a database. For simplicity we keep it as a local file.
-
-> The `raw_data/` directory plays the role of our own DWH, which we will
+> This dataset could realistically be stored on a database.
+> The `raw_data/` directory here plays the role of our own DWH, which we will
 > later "connect" to the feature store for our own convenience.
 
 _Note: in order to
@@ -69,7 +68,6 @@ The key used to join the two tables will be the SMS id.
 > which means Parquet files to store data. In the same spirit, the feature
 > registry will be a local SQLite database. In an actual production environment,
 > the offline store would presumably be a remote database (such as BigQuery).
-
 > Likewise, the store registry would better be stored in the cloud (e.g. on GCS):
 > this would enable a workflow where different teams simply clone the project's
 > repo and start working on the shared registry.
@@ -83,6 +81,11 @@ python scripts/create_offline_sources_1.py
 Two Parquet files are created in `offline_data/`, one with the labels and
 the other with the features, ready to be used as training set.
 
+All rows in each Parquet file bears the same `event_timestamp`
+(some time in 2019). This is secondary in this case, but would
+be relevant if these data did get updated somehow, to allow
+for time-travel-consistency in retrieving historical data.
+
 #### Setting up the Feast repo
 
 It's time to set up the Feast feature repository. The Parquet files
@@ -95,6 +98,17 @@ file.
 > with the right name, and make sure to enter your secrets, bundle file
 > and keyspace name.
 
+Now, with this Feast CLI command,
+
+```
+feast -c sms_feature_store apply
+```
+
+the local registry will be updated with the feature definitions
+found in `sms_feature_store/feature_definitions.py`, and
+in the online store (Astra DB) the tables for each feature view
+will be created (empty for the time being).
+
 #### Training the first model ("2019-model")
 
 Why did we go through this hassle with the feature store?
@@ -103,4 +117,27 @@ to the features and share them easily.
 
 Now, indeed, another team in the company can take these features and train
 the model by retrieving labels and features from the feature store.
+
+The data scientists can indeed start reading features from the feature
+store, the set of `sms_id` to use for training, and create the
+"2019" spam-detection model. Since they like to work with interactive notebooks,
+here's what you do:
+
+- start `jupyter notebook`
+- locate `training/model1_2019/train_model_1_2019.ipynb`
+- run it all the way to storing the trained model.
+
+The notebook accesses the Feast store and uses it to retrieve, from offline
+storage, the training data. To do so, the join on `sms_id` is done behind
+the scenes to give a dataset with features _and_ labels. Note we specify
+a date, to ensure we retrieve historically-consistent data ("as if time was
+frozen on that day").
+
+Once the data is transformed and the model is trained,
+it is stored to a file for later usage. _TODO_.
+
+> In a production environment, the model would be stored e.g. on cloud object
+> storage; moreover, if the feature registry were not just a local SQLite, this
+> part of the story could well be played on another machine, provided this
+> repo is there with all secrets set up.
 
