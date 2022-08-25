@@ -1,0 +1,4 @@
+# + in Feast: pip install -e ".[dev]" on a repo with HEAD detached at feb6cb85 (just merged with the cassandra branch)
+#
+pandas==1.4.3
+nltk==3.7
