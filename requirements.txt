@@ -4,6 +4,6 @@ pandas==1.4.3
 nltk==3.7
 jupyter==1.0.0
 scikit-learn==1.1.2
-fastapi==0.78.0
+fastapi==0.80.0
 python-dotenv==0.20.0
 uvicorn==0.18.2
