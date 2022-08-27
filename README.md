@@ -157,14 +157,14 @@ The first is tasked with serving the model. It has endpoints
 to convert a text into features, to convert features into a prediction,
 and one which combines the two and makes a text directly into a prediction.
 
-The API is written in a modular way in order to serve several versions
-of several models with the same endpoint pattern. This is achieved by wrapping
+The API, implemented with FastAPI, is written in a modular way in
+order to serve several versions
+of various models using the same (version-prefixed) endpoint pattern.
+This is achieved by wrapping
 the model (as stored during training) in a specific class, which in turn
-subclasses a generic `TextClassifierModel` interface.
-
-The API is implemented with FastAPI. In particular, each model version
-is defined with a "router", generated on the fly from a factory function
-(in principle, one per model version).
+subclasses a generic `TextClassifierModel` interface; instances of these
+classes, one per model/version, are given to a factory function that creates
+a corresponding FastAPI "router".
 
 At this stage, we can only serve model `v1`. To start the API,
 ```
@@ -173,11 +173,20 @@ uvicorn api.model_serving.model_serving_api:app
 
 and to test it you can try:
 ```
-curl -XPOST http://localhost:8000/model/v1/text_to_features -H 'Content-Type: application/json' -d '{"text": "I have a dream"}'
+curl -XPOST \
+  http://localhost:8000/model/v1/text_to_features \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
 
-curl -XPOST http://localhost:8000/model/v1/features_to_prediction -H 'Content-Type: application/json' -d '{"features": [0.09090909090909091,0.0,0,0,0,0,0,0,0]}'
+curl -XPOST \
+  http://localhost:8000/model/v1/features_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"features": [0.09090909090909091,0.0,0,0,0,0,0,0,0]}'
 
-curl -XPOST http://localhost:8000/model/v1/text_to_prediction -H 'Content-Type: application/json' -d '{"text": "I have a dream"}'
+curl -XPOST \
+  http://localhost:8000/model/v1/text_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
 ```
 
 You can also check the auto-generated OpenAPI docs: `http://127.0.0.1:8000/docs`.
@@ -186,16 +195,65 @@ Note that in principle this API could be used not only by the front-end (text-to
 from the raw input SMS text.
 
 TODO:
+
 - cache
 - call log
-- multiple texts (+ cache)
+- (cache-aware) multiple input endpoint
 
-#### The rest of the 2019 app
+#### The user-data API
 
-A second API doing the menial work of "ordinarily serving the app"
+The other API, kept as a separate service out of cleanliness,
+will handle the data of our app users. This app is a simple
+SMS service, whereby users can visualize their inbox.
 
+> Throughout this demo, of course, security, authentication and other matters
+> are ignored for the sake of simplicity. _Don't do this in production._
 
-TODO:
+The API has endpoints to retrieve the messages stored as belonging to
+(as in "received by") a given
+user's inbox (either all of them or one by one by their message ID).
 
-- an app with a simple users-sms-text backing table, via API
-- a simple react frontend to demo this
+The data is stored on an Astra DB table, with a simple structure: there are
+columns `user_id` (recipient), `sms_id` (a time-ordered unique TIMEUUID),
+`sender_id` and `sms_text`. The primary key is `(( user_id ), sms_id)`,
+with a partitioning that makes it easy to retrieve all messages for a given
+user at once.
+
+> Notes: (1) for more on partitioning in Cassandra and Astra DB, we recommend
+> the workshop about ["Data Modeling"](https://github.com/datastaxdevs/workshop-cassandra-data-modeling). (2) In a real production app,
+> mitigation techniques would be put in place to prevent partitions from growing
+> too large (i.e. if a user starts hoarding enormous amounts of messages).
+> (3) Here, for simplicity, we'll keep the table in the same keyspace as the
+> rest of the architecture: such a choice might not be optimal in a real app.
+> (4) User IDs would be better defined as type UUID, but here we wanted to
+> keep things simple.
+
+First provide the Astra DB credentials by copying file `.env.sample` to `.env`
+and filling the required values (much like you did for the feature-store
+YAML file above).
+
+Now you can run this script to create the table and populate it with
+sample data:
+```
+python scripts/initialize_user_api_data.py
+```
+
+> Tip: you can check the data with the following CQL query:
+> `SELECT sms_id, toDate(sms_id), sender_id, sms_text FROM smss_by_users WHERE user_id='max';`.
+
+The user-data API can now be started (on a different port than the other API):
+```
+uvicorn api.user_data.user_api:app --port 8111
+```
+
+You can test it with:
+```
+curl http://localhost:8111/sms/max
+
+curl http://localhost:8111/sms/fiona/32e14000-8400-11e9-aeb7-d19b11ef0c7e
+```
+
+(and see the docs at `http://localhost:8111/docs` as well.)
+
+#### a simple react frontend to demo this
+

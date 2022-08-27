@@ -7,3 +7,4 @@ scikit-learn==1.1.2
 fastapi==0.80.0
 python-dotenv==0.20.0
 uvicorn==0.18.2
+time-uuid==0.2.0
