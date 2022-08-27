@@ -150,9 +150,46 @@ for later usage.
 
 #### Serving the model in production (2019)
 
-A first API "v1" able to process text as well as a featurelist,
-subjecting it to the model.
-Also it handles feature extraction.
+We are about to launch our first app. In the spirit of microservices,
+there will be _two_ separate APIs behind the front-end.
+
+The first is tasked with serving the model. It has endpoints
+to convert a text into features, to convert features into a prediction,
+and one which combines the two and makes a text directly into a prediction.
+
+The API is written in a modular way in order to serve several versions
+of several models with the same endpoint pattern. This is achieved by wrapping
+the model (as stored during training) in a specific class, which in turn
+subclasses a generic `TextClassifierModel` interface.
+
+The API is implemented with FastAPI. In particular, each model version
+is defined with a "router", generated on the fly from a factory function
+(in principle, one per model version).
+
+At this stage, we can only serve model `v1`. To start the API,
+```
+uvicorn api.model_serving.model_serving_api:app
+```
+
+and to test it you can try:
+```
+curl -XPOST http://localhost:8000/model/v1/text_to_features -H 'Content-Type: application/json' -d '{"text": "I have a dream"}'
+
+curl -XPOST http://localhost:8000/model/v1/features_to_prediction -H 'Content-Type: application/json' -d '{"features": [0.09090909090909091,0.0,0,0,0,0,0,0,0]}'
+
+curl -XPOST http://localhost:8000/model/v1/text_to_prediction -H 'Content-Type: application/json' -d '{"text": "I have a dream"}'
+```
+
+You can also check the auto-generated OpenAPI docs: `http://127.0.0.1:8000/docs`.
+
+Note that in principle this API could be used not only by the front-end (text-to-prediction, presumably), but also by backend services tasked with writing rows to a feature store
+from the raw input SMS text.
+
+TODO:
+- cache
+- multiple texts (+ cache)
+
+#### The rest of the 2019 app
 
 A second API doing the menial work of "ordinarily serving the app"
 
@@ -160,5 +197,4 @@ A second API doing the menial work of "ordinarily serving the app"
 TODO:
 
 - an app with a simple users-sms-text backing table, via API
-- an API exposing the model (versioned url paths)
 - a simple react frontend to demo this
