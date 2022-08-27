@@ -187,6 +187,7 @@ from the raw input SMS text.
 
 TODO:
 - cache
+- call log
 - multiple texts (+ cache)
 
 #### The rest of the 2019 app
