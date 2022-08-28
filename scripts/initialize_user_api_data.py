@@ -62,7 +62,7 @@ if __name__ == '__main__':
                 # 2019-06-05
                 'dc884000-8724-11e9-90f9-878916a9ab9c',
                 'nina',
-                'Want to hang out tomorow?'
+                'Want to hang out tomorrow?'
             ),
             (
                 # 2019-06-06

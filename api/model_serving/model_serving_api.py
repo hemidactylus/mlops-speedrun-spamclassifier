@@ -1,6 +1,8 @@
 import os
 from fastapi import FastAPI
 
+from api.tools.localCORS import permitReactLocalhostClient
+
 from api.model_serving.routers.model_router import createModelRouter
     
 from api.model_serving.aimodels.RandomForestModel import RandomForestModel
@@ -31,6 +33,9 @@ app = FastAPI(
     version="1.0",
     openapi_tags=tags_metadata,
 )
+
+# this is really a 'demo mode' thing which should be refined!
+permitReactLocalhostClient(app)
 
 # include router(s)
 if 'v1' in EXPOSED_VERSIONS: # expose model v1 2019

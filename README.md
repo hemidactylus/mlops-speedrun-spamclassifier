@@ -241,7 +241,8 @@ python scripts/initialize_user_api_data.py
 > Tip: you can check the data with the following CQL query:
 > `SELECT sms_id, toDate(sms_id), sender_id, sms_text FROM smss_by_users WHERE user_id='max';`.
 
-The user-data API can now be started (on a different port than the other API):
+The user-data API can now be started in another shell
+(also on a different port than the other API):
 ```
 uvicorn api.user_data.user_api:app --port 8111
 ```
@@ -255,5 +256,21 @@ curl http://localhost:8111/sms/fiona/32e14000-8400-11e9-aeb7-d19b11ef0c7e
 
 (and see the docs at `http://localhost:8111/docs` as well.)
 
-#### a simple react frontend to demo this
+#### The frontend
 
+The Web app is a simple React app where users "login" by entering their name
+and can see their inbox. For each SMS, they can reach the spam-detection API
+and get an assessment on the message text (by clicking on the
+magnifying-glass icons).
+
+To start the client:
+```
+cd client/sms_web_app
+npm install
+REACT_APP_SPAM_MODEL_VERSION=v1 npm start
+```
+
+(note that we pass the model version to reach in the Spam API),
+then open `http://localhost:3000/` in the browser.
+
+>*Tip*: enter `fiona` or `max` as "username", to see some SMS messages.

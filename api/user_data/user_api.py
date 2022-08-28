@@ -2,13 +2,14 @@ import uuid
 from typing import List
 from fastapi import FastAPI, Depends, Response, status
 
+from api.tools.localCORS import permitReactLocalhostClient
+
 from api.user_data.storage.db_io import (
     retrieve_sms,
     retrieve_smss_by_sms_id,
 )
 from api.user_data.utils.db_dependency import g_get_session
 from api.user_data.utils.models import DateRichSMS
-
 
 apiDescription="""
 SMS Data API
@@ -22,6 +23,8 @@ app = FastAPI(
     description=apiDescription,
 )
 
+# this is really a 'demo mode' thing which should be refined!
+permitReactLocalhostClient(app)
 
 @app.get('/sms/{user_id}/{sms_id_str}', response_model=DateRichSMS)
 async def get_sms(user_id, sms_id_str, response: Response, session=Depends(g_get_session)):

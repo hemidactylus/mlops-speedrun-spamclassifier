@@ -6,3 +6,11 @@ __pycache__
 offline_data/*.parquet
 .ipynb_checkpoints
 registry.db
+
+# client
+node_modules
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
