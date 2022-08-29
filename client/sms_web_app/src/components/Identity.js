@@ -10,6 +10,11 @@ const Identity = (props) => {
 
   const [editUserId, setEditUserId] = useState('');
 
+  const trySetUserId = (newUserId) => {
+    if(newUserId){
+      setUserId(newUserId);
+    }
+  }
 
   return (
     <div className="App-identity">
@@ -22,13 +27,10 @@ const Identity = (props) => {
             name="userid"
             value={editUserId}
             onChange={(e) => setEditUserId(e.target.value)}
+            onKeyPress={(e) => {if (e.key === 'Enter') { trySetUserId(editUserId) }}}
           />
           <button
-            onClick={() => {
-              if(setUserId){
-                setUserId(editUserId);
-              }
-            }}
+            onClick={() => trySetUserId(editUserId)}
             className="inlineButton"
           >
             Login

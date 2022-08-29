@@ -38,19 +38,24 @@ const SMSList = (props) => {
         <p><code>Fetching ...</code></p>
       </div>}
       {!fetching && <div>
-        <p><code>Your inbox:</code></p>
-        <code>
-          <ul>
-            { messageList.map( msg => (
-              <li key={msg.sms_id}>
-                <SMS
-                  sms={msg}
-                />
-              </li>
-            ))
-            }
-          </ul>
-        </code>
+        { (messageList.length > 0) && <div>
+          <p><code>Your inbox:</code></p>
+          <code>
+            <ul>
+              { messageList.map( msg => (
+                <li key={msg.sms_id}>
+                  <SMS
+                    sms={msg}
+                  />
+                </li>
+              ))
+              }
+            </ul>
+          </code>
+        </div>}
+        { (messageList.length === 0) && <div>
+          <p><code>Your inbox is empty :|</code></p>
+        </div>}        
       </div>}
     </div>}
     </div>

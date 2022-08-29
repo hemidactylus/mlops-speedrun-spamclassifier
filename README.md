@@ -168,7 +168,7 @@ a corresponding FastAPI "router".
 
 At this stage, we can only serve model `v1`. To start the API,
 ```
-uvicorn api.model_serving.model_serving_api:app
+SPAM_MODEL_VERSIONS="v1" uvicorn api.model_serving.model_serving_api:app
 ```
 
 and to test it you can try:
@@ -274,3 +274,10 @@ REACT_APP_SPAM_MODEL_VERSION=v1 npm start
 then open `http://localhost:3000/` in the browser.
 
 >*Tip*: enter `fiona` or `max` as "username", to see some SMS messages.
+
+### Chapter 2: 2020
+
+It's 2020, and the data science team decides to train a new, better model from
+scratch using the same labels. The model, however, is radically different,
+and the required features too.
+
