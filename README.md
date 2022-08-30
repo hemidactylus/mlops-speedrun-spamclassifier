@@ -337,3 +337,8 @@ the network architecture, re-casting the labels with one-hot-encoding,
 and start with the actual training.
 
 As usual, this is done in a notebook: _to complete_
+
+TODO:
+
+- metrics on the trained model
+- tokenizer proper-json storage and 2fold retrieval
