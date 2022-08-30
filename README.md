@@ -340,5 +340,46 @@ As usual, this is done in a notebook: _to complete_
 
 TODO:
 
-- metrics on the trained model
-- tokenizer proper-json storage and 2fold retrieval
+- metrics on the trained model in the notebook
+
+#### Extending the model-serving API
+
+Now in order to upgrade the model-serving API so that it can also
+expose the new model ("v2", i.e. the 2020 model, including its feature
+extractor) all we need to do is to create the `KerasLSTMModel` subclass
+of `TextClassifierModel` and wire it to the API with the dynamic
+FastAPI router factory used already for `"v1"`.
+See file `api/model_serving/aimodels/KerasLSTMModel.py` and
+the `"v2"` branch in `api/model_serving/model_serving_api.py`. To start the API with
+both models:
+```
+SPAM_MODEL_VERSIONS="v1,v2" uvicorn api.model_serving.model_serving_api:app
+```
+
+and to test the endpoints for the new model:
+
+```
+curl -XPOST \
+  http://localhost:8000/model/v2/text_to_features \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
+
+curl -XPOST \
+  http://localhost:8000/model/v2/features_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"features": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+                    0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}'
+
+curl -XPOST \
+  http://localhost:8000/model/v2/text_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
+```
+
+#### Client test for "v2"
+
+Provided both API services are running, this is simply:
+```
+REACT_APP_SPAM_MODEL_VERSION=v2 npm start
+```

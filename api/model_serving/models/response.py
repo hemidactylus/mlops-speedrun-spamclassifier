@@ -10,8 +10,15 @@ class PredictionTopInfo(BaseModel):
     value: float
 
 
-class PredictionResult(BaseModel):
+class PredictionResultFromText(BaseModel):
     input: Optional[str]
+    prediction: Dict[str, float]
+    top: Optional[PredictionTopInfo]
+    from_cache: bool = False
+
+
+class PredictionResultFromFeatures(BaseModel):
+    input: Optional[List[float]]
     prediction: Dict[str, float]
     top: Optional[PredictionTopInfo]
     from_cache: bool = False
