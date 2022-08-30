@@ -17,7 +17,7 @@ raw_input_file = os.path.join(base_dir, '..', 'raw_data', 'raw_dataset.csv')
 
 output_dir = os.path.join(base_dir, '..', 'models', 'model2_2020', 'tokenizer')
 output_metadata_file = os.path.join(output_dir, 'settings.json')
-output_tokenizer_file = os.path.join(output_dir, 'tokenizer.pkl')
+output_tokenizer_file = os.path.join(output_dir, 'tokenizer.json')
 
 if __name__ == '__main__':
     # read input training texts
@@ -49,8 +49,8 @@ if __name__ == '__main__':
     }
     with open(output_metadata_file, 'w') as m_of:
         json.dump(t_metadata, m_of, indent=2)
-    with open(output_tokenizer_file, 'wb') as t_of:
-        pickle.dump(tokenizer, t_of)
+    with open(output_tokenizer_file, 'w') as t_of:
+        t_of.write(tokenizer.to_json(indent=2))
 
     print('Tokenizer persisted to:')
     print('    - ' + output_metadata_file)
