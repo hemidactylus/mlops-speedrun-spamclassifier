@@ -5,12 +5,6 @@ from api.tools.localCORS import permitReactLocalhostClient
 
 from api.model_serving.routers.model_router import createModelRouter
     
-from api.model_serving.aimodels.RandomForestModel import RandomForestModel
-from api.model_serving.aimodels.KerasLSTMModel import KerasLSTMModel
-#
-from analysis.features1.feature1_extractor import Feature1Extractor
-from analysis.features2.feature2_extractor import Feature2Extractor
-#
 from api.model_serving.config.config import getSettings
 
 
@@ -48,6 +42,10 @@ permitReactLocalhostClient(app)
 
 # include router(s)
 if 'v1' in exposed_model_version_set:  # expose model v1 2019
+    #
+    from analysis.features1.feature1_extractor import Feature1Extractor
+    from api.model_serving.aimodels.RandomForestModel import RandomForestModel
+    #
     model_v1 = RandomForestModel(
         model_path=os.path.join(models_dir, 'model1_2019', 'model1.pkl'),
         feature_extractor=Feature1Extractor(),
@@ -56,6 +54,10 @@ if 'v1' in exposed_model_version_set:  # expose model v1 2019
     app.include_router(createModelRouter('v1', model_v1))
 
 if 'v2' in exposed_model_version_set:  # expose model v2 2020
+    #
+    from analysis.features2.feature2_extractor import Feature2Extractor
+    from api.model_serving.aimodels.KerasLSTMModel import KerasLSTMModel
+    #
     model_v2 = KerasLSTMModel(
         model_path=os.path.join(models_dir, 'model2_2020', 'classifier', 'model2.h5'),
         model_metadata_path=os.path.join(models_dir, 'model2_2020', 'classifier', 'model2_metadata.json'),
