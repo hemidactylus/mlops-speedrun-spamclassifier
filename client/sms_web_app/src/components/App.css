@@ -53,6 +53,17 @@
   margin-right: 20px;
 }
 
+.headerTitle {
+  margin-bottom: 5px;
+}
+
+.headerSubtitle {
+  color: #90DFDF;
+  margin-top: 0px;
+  font-size: 60%;
+  font-style: italic;
+}
+
 .App-link {
   color: #61dafb;
 }

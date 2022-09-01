@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const model_version = process.env.REACT_APP_SPAM_MODEL_VERSION || 'v1';
+export const model_version = process.env.REACT_APP_SPAM_MODEL_VERSION || 'v1';
 
 export const checkSpamStatus = (sms_text, callback) => {
   axios.post(
