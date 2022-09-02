@@ -22,7 +22,7 @@ def _validate_id(s):
 if __name__ == '__main__':
     #
     if sys.argv[1:] == []:
-        sms_ids = ['14050', '14051', '14052']
+        sms_ids = ['sms14050', 'sms14051', 'sms14052']
     else:
         sms_ids = sorted({
             _id

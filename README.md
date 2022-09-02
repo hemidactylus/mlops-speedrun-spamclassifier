@@ -352,7 +352,7 @@ of `TextClassifierModel` and wire it to the API with the dynamic
 FastAPI router factory used already for `"v1"`.
 See file `api/model_serving/aimodels/KerasLSTMModel.py` and
 the `"v2"` part in `api/model_serving/model_serving_api.py`. To start the API with
-both models:
+both models (`Ctrl-C` it first if still running from earlier):
 ```
 SPAM_MODEL_VERSIONS="v1,v2" uvicorn api.model_serving.model_serving_api:app
 ```
@@ -499,7 +499,7 @@ We have a tiny script that tries to fetch "v1" and "v2" features from the
 online store, and we'll use it in this section to illustrate what's going on.
 Try running
 ```
-python scripts/online_store_sampler.py 14050 14051 14052
+python scripts/online_store_sampler.py sms14050 sms14051 sms14052
 ```
 and you should see that nothing is found (yet!) on the online store for any
 feature service.
@@ -516,7 +516,7 @@ if it takes many tens of minutes!)_
 
 Running the online sampler script now,
 ```
-python scripts/online_store_sampler.py 14050 14051 14052
+python scripts/online_store_sampler.py sms14050 sms14051 sms14052
 ```
 will show that the `labeled_sms_1` features are found in the online store,
 while the `labeled_sms_2` (created in 2020) are not there yet.
@@ -558,9 +558,9 @@ curl -s -X POST \
             ],
             "entities": {
                 "sms_id": [
-                    14050,
-                    14051,
-                    14052
+                    'sms14050',
+                    'sms14051',
+                    'sms14052'
                 ]
             }
         }
@@ -575,9 +575,9 @@ curl -s -X POST \
             "feature_service": "labeled_sms_2",
             "entities": {
                 "sms_id": [
-                    14050,
-                    14051,
-                    14052
+                    'sms14050',
+                    'sms14051',
+                    'sms14052'
                 ]
             }
         }
@@ -673,7 +673,10 @@ The changes are as follows:
 - the "Inbox API", when receiving a new message, will:
   + contact the model-serving API to get the "v2" features;
   + contact the feature server to push them to the feature store, for later online usage;
-  + write the SMS to the database table for the user-data API.
+  + write the SMS to the database table for the user-data API: to do that, we add a "write SMS" endpoint to the latter service;
 - the client will ask the feature server for the features of a SMS, based on its `sms_id`.
 - it will then query the `features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
 - (we need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox);
+
+##### User-data API
+
