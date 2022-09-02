@@ -6,8 +6,8 @@ const Header = () => {
 
   return (
     <header className="App-header">
-      <h3 className="headerTitle"><code>SMS App</code></h3>
-      <p className="headerSubtitle"><code>(using model version "{model_version}")</code></p>
+      <h3 className="headerTitle">SMS App</h3>
+      <p className="headerSubtitle">(using model version "{model_version}")</p>
     </header>
   );
 }

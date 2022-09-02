@@ -23,7 +23,7 @@ components will be mocked with local (non-production) equivalents.
 - Create a Python 3.8+ virtualenv and `pip install -r requirements.txt` into it.
 - Add the repo's root to the Pythonpath of the virtualenv
 - **TEMP** Take care of installing a certain commit of Feast in development mode, see instructions in `requirements.txt`
-- Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values
+- Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values _(Note: in real life you probably would have run `feast init sms_feature_store -t cassandra` and have followed the interactive procedure)_
 
 ## The story
 
@@ -336,11 +336,12 @@ It is now time to create the model and train it. This requires devising
 the network architecture, re-casting the labels with one-hot-encoding,
 and start with the actual training.
 
-As usual, this is done in a notebook: _to complete_
-
-TODO:
-
-- metrics on the trained model in the notebook
+As usual, this is done in a notebook: running all of
+```
+training/model2_2020/train_model_2_2020.ipynb
+```
+will result in the model being stored, for later usage, in
+`models/model3_2021/classifier`.
 
 #### Extending the model-serving API
 
@@ -350,7 +351,7 @@ extractor) all we need to do is to create the `KerasLSTMModel` subclass
 of `TextClassifierModel` and wire it to the API with the dynamic
 FastAPI router factory used already for `"v1"`.
 See file `api/model_serving/aimodels/KerasLSTMModel.py` and
-the `"v2"` branch in `api/model_serving/model_serving_api.py`. To start the API with
+the `"v2"` part in `api/model_serving/model_serving_api.py`. To start the API with
 both models:
 ```
 SPAM_MODEL_VERSIONS="v1,v2" uvicorn api.model_serving.model_serving_api:app
@@ -379,7 +380,300 @@ curl -XPOST \
 
 #### Client test for "v2"
 
-Provided both API services are running, this is simply:
+Provided both API services are running (remember
+`uvicorn api.user_data.user_api:app --port 8111`), this is simply:
 ```
 REACT_APP_SPAM_MODEL_VERSION=v2 npm start
 ```
+
+
+### Chapter 3: 2021
+
+#### A new model on old features
+
+The data science team decides to take the challenge again
+and starts building a new, more accurate spam detection model,
+which will be "v3" a.k.a. "2021".
+
+> *Hint*: it may well have been another team doing this: having a feature store
+> as a central "hub" indeed enables feature discovery across teams. Check the
+> script `python scripts/feature_store_explorer.py` to see how the feature store
+> can be directly inspected to look for existing features.
+
+They decide to start from the same features as the previous model, though:
+In the spirit of this demo, this is also to emphasize the modularity
+of the moving parts at play:
+
+- no need for new elements in the feature store
+- the spam-detection API will have a new "v3" set of endpoints, combining the same feature extractor as "v2" with a new trained model.
+
+This model will be an improvement over "v2", with a similar architecture (LSTM recurrent neural network
+with slightly different parameters). Training will take place, similarly as before, by running the notebook
+```
+training/model3_2021/train_model_3_2021.ipynb
+```
+
+and, as a result, the model will be stored in `models/model3_2021/classifier` (no need for a separate `tokenizer` directory as it'll use the one from v2).
+
+Similarly as what was done for "v2", a new set of "v3" routes
+is added to the model-serving API, which can now be started
+as:
+```
+SPAM_MODEL_VERSIONS="v1,v2,v3" uvicorn api.model_serving.model_serving_api:app
+```
+
+and tested with:
+```
+curl -XPOST \
+  http://localhost:8000/model/v3/text_to_features \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
+
+curl -XPOST \
+  http://localhost:8000/model/v3/features_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"features": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+                    0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}'
+
+curl -XPOST \
+  http://localhost:8000/model/v3/text_to_prediction \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "I have a dream"}'
+```
+
+As for the client, it can be made to point to the new model with:
+```
+REACT_APP_SPAM_MODEL_VERSION=v3 npm start
+```
+(if the user-data API is also running, `uvicorn api.user_data.user_api:app --port 8111`).
+
+#### Toward real-time
+
+Now the company wants to improve the service to the users
+by adding ingestion of new SMS messages into the app.
+
+To continue adhering to a microservice approach, there will be yet another API,
+the "Inbox API", tasked with offering to external actors
+(such as the telephone company) an endpoint to insert new messages
+into our system. This webhook will take care, internally, of everything
+needed to deal with the arrival of a new message.
+
+So far, we have used
+Feast's "offline feature store" capability, i.e. specialized methods to
+retrieve point-in-time data from what essentially is a time-series warehouse.
+Now it's time to start using the **online store**: a low-latency data store
+where the latest features for any given entity are saved for fast retrieval.
+In practice, while the offline store contains the whole time series (the "history")
+of the feature values for an entity, the online store is where only the most
+up-to-date entry will be kept.
+
+There are various ways to "refresh" the online store. One such approach is to
+manually invoke the "materialize" operation, which will scan the offline store
+(starting from the last materialization done so far) and transport the data over
+to the online store.
+There are plugins to use several databases as online store: as can be seen in
+`sms_feature_score/feature_store.yaml`, we are using Astra DB.
+
+> The rationale behind keeping the latest features in the online store, in our
+> case, is that computing the features can be expensive to do in real-time when
+> the user needs them, so we prefer to pre-compute them
+> as soon as the new raw data comes in. Other valid solutions might involve
+> enqueueing their computation, for instance in a Pulsar topic, for consumption
+> as a background asynchronous task. See toward the end for a sketch of such
+> a solution, based on CDC, Astra Streaming and Pulsar functions.
+
+Materialization is invoked with an explicit date parameter: it will consider
+all offline data up to that moment, "as if time stopped at the provided date".
+Imagine your user data (features) change over time, such as a
+"last 10 items purchased" metric. These, at each user interaction, would be
+accumulated in a time-series fashion (in our case, in the parquet files).
+By scheduling a periodic (incremental) materialization, one makes sure that
+the online store gets updated and contains the latest value for this metric.
+The online store can then be queried to quickly obtain an up-to-date feature
+set, ready for real-time prediction.
+
+#### Materialize
+
+We have a tiny script that tries to fetch "v1" and "v2" features from the
+online store, and we'll use it in this section to illustrate what's going on.
+Try running
+```
+python scripts/online_store_sampler.py 14050 14051 14052
+```
+and you should see that nothing is found (yet!) on the online store for any
+feature service.
+
+Now we'll pretend for a moment that it's still 2019 and we materialize
+from "the beginning of time" to the end of the year. This should catch all
+and only the entries in the "v1" feature set (along with the label set)
+and transport them over to the online store:
+```
+feast -c sms_feature_store materialize 2009-01-01T00:00:00 2019-12-31T00:00:00
+```
+_(Note: this process is considered an "exceptional" bulk operation; don't worry
+if it takes many tens of minutes!)_
+
+Running the online sampler script now,
+```
+python scripts/online_store_sampler.py 14050 14051 14052
+```
+will show that the `labeled_sms_1` features are found in the online store,
+while the `labeled_sms_2` (created in 2020) are not there yet.
+
+Now it's time to do an incremental materialize step and bring the
+online store up to date:
+```
+feast -c sms_feature_store materialize-incremental 2021-09-02T00:00:00
+```
+
+The reading script will now find features for both feature services.
+
+_As remarked above, we could content ourselves with a new-message-ingestion
+process that writes to the offline store, and a scheduled materialization
+to have the features ready to be served to the app. But we want to do better..._
+
+Feast provides two very interesting tools to make our app more streamlined:
+a feature server and push sources. Let's see how they can become part of
+our production pipeline and get us closer to a real-time architecture.
+
+#### Feature server
+
+Most operations on a Feast store can be exposed by the "feature server", which
+is an HTTP API wrapping the core operations. To start it, you can simply run:
+
+```
+feast -c sms_feature_store serve
+```
+Now you can start querying it (the default port is 6566) to retrieve feature values,
+either asking for an explicit list of features from one or more feature views:
+```
+curl -s -X POST \
+  http://127.0.0.1:6566/get-online-features \
+  -d  '
+        {
+            "features": [
+                "sms_features1:cap_r",
+                "sms_labels:label"
+            ],
+            "entities": {
+                "sms_id": [
+                    14050,
+                    14051,
+                    14052
+                ]
+            }
+        }
+      '
+```
+or directly specifying a feature service:
+```
+curl -s -X POST \
+  http://127.0.0.1:6566/get-online-features \
+  -d  '
+        {
+            "feature_service": "labeled_sms_2",
+            "entities": {
+                "sms_id": [
+                    14050,
+                    14051,
+                    14052
+                ]
+            }
+        }
+      '
+```
+
+#### Push sources
+
+Another crucial element in Feast are _push sources_. These, which get
+"attached" to regular sources, allow for dynamic pushing of new entity
+rows (with their features) and, combined with the above HTTP feature server,
+make it possible to use Feast as infrastructure for inserting new data into
+the store in real-time.
+
+We'll enable a push source for our "v2" features, with the goal of using
+it to handle the real-time architecture described above with these features
+pre-computed and ready to be used in user-initiated predictions.
+
+We start by altering the feature definitions for the store: until now we had
+the `FileSource` wired to the `FeatureView` through the `source` parameter in the latter
+(namely `smss2 -> features2_view`); now we'll have a chain
+`FileSource -> PushSource -> FeatureView`, i.e.
+```
+smss2 -> smss2_push -> features2_view
+```
+The nice thing is that once we have this setup, anything we push will be
+automatically propagated along this chain.
+
+The changes are encoded in the `sms_feature_store/feature_definitions.py`
+once we set the environment variable `FEAST_STORE_STAGE=2021`, so now we need
+to run
+```
+FEAST_STORE_STAGE=2021 feast -c sms_feature_store apply
+```
+
+Make sure the feature server is restarted (`Ctrl-C` and then re-run
+the `feast -c sms_feature_store serve` command).
+
+We can now *push new entity rows to the feature store* directly through
+the feature server. The following command will push a newer version
+of the "v2" features for the SMS with `sms_id=14052`, _both to the offline
+and the online store_:
+
+```
+curl -X POST "http://localhost:6566/push" -d '{
+    "push_source_name": "smss2_push",
+    "df": {
+            "sms_id": [14052],
+            "event_timestamp": ["2021-09-02 00:00:00"],
+            "features": [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,65,65,108,2,30]]
+    },
+    "to": "online_and_offline"
+  }'
+```
+
+Let us check the online store with the script:
+```
+python scripts/online_store_sampler.py 14052
+```
+and by querying the server:
+```
+curl -s -X POST \
+  http://127.0.0.1:6566/get-online-features \
+  -d  '
+        {
+            "feature_service": "labeled_sms_2",
+            "entities": {
+                "sms_id": [14052]
+            }
+        }
+      '
+```
+
+In short:
+
+- the offline store has received a new line in its time-series, with more recent timestamp;
+- in the online store, the entry for that SMS and for features "v2" has been overwritten and is ready to be used.
+
+This bypasses the need to run (scheduled or otherwise) an explicit materialization step.
+
+> _Note_: This write is just for demonstration purposes: the new
+> feature values make little sense in
+> themselves. Still, this will be harmless - even if we were to repeat the
+> training step, the point-in-time offline feature retrieval would not fetch
+> this update as its date is beyond its `training_timefreeze`; and the SMS
+> messages from the training set will not be used anywhere else in the app.
+
+#### App architecture II
+
+It is now time to revise the app and take advantage of the feature server.
+The changes are as follows:
+
+- the "Inbox API", when receiving a new message, will:
+  + contact the model-serving API to get the "v2" features;
+  + contact the feature server to push them to the feature store, for later online usage;
+  + write the SMS to the database table for the user-data API.
+- the client will ask the feature server for the features of a SMS, based on its `sms_id`.
+- it will then query the `features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
+- (we need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox);

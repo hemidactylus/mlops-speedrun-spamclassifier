@@ -5,7 +5,7 @@ import os
 #  successive stages in refining the composition of the feature store).
 FEAST_STORE_STAGE = os.environ.get('FEAST_STORE_STAGE', '2019')
 
-from feast import Entity, FeatureService, FeatureView, Field, FileSource
+from feast import Entity, FeatureService, FeatureView, Field, FileSource, PushSource
 from feast.types import Float32, Int64, String, Array
 
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -30,8 +30,8 @@ features1_view = FeatureView(
     name='sms_features1',
     entities=[sms],
     schema=[
-        Field(name='cap_r', dtype=Float32),
-        Field(name='nal_r', dtype=Float32),
+        Field(name='cap_r', dtype=Float32, tags={'description': 'fraction of capitalized letters'}),
+        Field(name='nal_r', dtype=Float32, tags={'description': 'non-alphabetic over alphabetic char fraction'}),
     ] + [
         Field(name='cw_scores_%i' % i, dtype=Int64)
         for i in range(7)
@@ -58,6 +58,9 @@ if FEAST_STORE_STAGE in {'2020', '2021'}:
         path=os.path.join(data_dir, 'sms_features2.parquet'),
         timestamp_field='event_timestamp',
     )
+
+if FEAST_STORE_STAGE == '2020':
+    # direct file-source to feature view
     features2_view = FeatureView(
         name='sms_features2',
         entities=[sms],
@@ -68,6 +71,24 @@ if FEAST_STORE_STAGE in {'2020', '2021'}:
         source=smss2,
         tags={},
     )
+elif FEAST_STORE_STAGE == '2021':
+    # file source -> push source -> feature view chain this time:
+    smss2_push = PushSource(
+        name="smss2_push",
+        batch_source=smss2,
+    )
+    features2_view = FeatureView(
+        name='sms_features2',
+        entities=[sms],
+        schema=[
+            Field(name='features', dtype=Array(Int64)),
+        ],
+        online=True,
+        source=smss2_push,
+        tags={},
+    )
+
+if FEAST_STORE_STAGE in {'2020', '2021'}:
     labeled2 = FeatureService(
         name='labeled_sms_2',
         features=[
@@ -83,4 +104,6 @@ labeled1 = FeatureService(
         features1_view,
         label_view,
     ],
+    description='SMS entities with labels and their features, good for training',
+    tags={'version': 'v1', 'year': '2019'},
 )

@@ -5,7 +5,8 @@ from api.user_data.storage.db_connect import get_session
 CREATE_USER_TABLE_CQL = '''
 CREATE TABLE IF NOT EXISTS smss_by_users (
     user_id     TEXT,
-    sms_id      TIMEUUID,
+    sms_id      INT,
+    sms_date    TIMESTAMP,
     sender_id   TEXT,
     sms_text    TEXT,
     PRIMARY KEY (( user_id ), sms_id )

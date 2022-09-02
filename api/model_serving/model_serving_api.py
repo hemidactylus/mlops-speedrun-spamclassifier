@@ -64,3 +64,16 @@ if 'v2' in exposed_model_version_set:  # expose model v2 2020
         feature_extractor=Feature2Extractor(),
     )
     app.include_router(createModelRouter('v2', model_v2))
+
+if 'v2' in exposed_model_version_set:  # expose model v3 2021
+    #
+    from analysis.features2.feature2_extractor import Feature2Extractor
+    from api.model_serving.aimodels.KerasLSTMModel import KerasLSTMModel
+    #
+    model_v3 = KerasLSTMModel(
+        model_path=os.path.join(models_dir, 'model3_2021', 'classifier', 'model3.h5'),
+        model_metadata_path=os.path.join(models_dir, 'model3_2021', 'classifier', 'model3_metadata.json'),
+        # the feature extractor is the same as "v2"
+        feature_extractor=Feature2Extractor(),
+    )
+    app.include_router(createModelRouter('v3', model_v3))

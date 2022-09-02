@@ -31,30 +31,28 @@ const SMSList = (props) => {
   return (
     <div className="App-smslist">
     { !userId && <div>
-      <p><code>(log in first.)</code></p>
+      <p>(log in first.)</p>
     </div>}
     { userId && <div>
       {fetching && <div>
-        <p><code>Fetching ...</code></p>
+        <p>Fetching ...</p>
       </div>}
       {!fetching && <div>
         { (messageList.length > 0) && <div>
-          <p><code>Your inbox:</code></p>
-          <code>
-            <ul>
-              { messageList.map( msg => (
-                <li key={msg.sms_id}>
-                  <SMS
-                    sms={msg}
-                  />
-                </li>
-              ))
-              }
-            </ul>
-          </code>
+          <p>Your inbox:</p>
+          <ul>
+            { messageList.map( msg => (
+              <li key={msg.sms_id}>
+                <SMS
+                  sms={msg}
+                />
+              </li>
+            ))
+            }
+          </ul>
         </div>}
         { (messageList.length === 0) && <div>
-          <p><code>Your inbox is empty :|</code></p>
+          <p>Your inbox is empty :|</p>
         </div>}        
       </div>}
     </div>}

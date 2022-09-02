@@ -1,5 +1,6 @@
 .App {
   background-color: #000020;
+  font-family: Courier;
 }
 
 .App-header {
@@ -30,10 +31,21 @@
 
 .inlineInput {
   margin-left: 15px;
+  padding-left: 10px;
+  font-size: 100%;
+  background-color: transparent;
+  border: 2px solid #A0FFFF;
+  border-radius: 10px;
+  color: #70BFBF;
 }
 
 .inlineButton {
-  margin-left: 15px;
+  margin-left: 25px;
+  font-size: 100%;
+  background-color: transparent;
+  border: 2px solid #A0FFFF;
+  border-radius: 10px;
+  color: #70BFBF;
 }
 
 .smsText {
@@ -51,6 +63,10 @@
 }
 .spamStatus {
   margin-right: 20px;
+}
+.userName {
+  color: gold;
+  font-weight: bold;
 }
 
 .headerTitle {

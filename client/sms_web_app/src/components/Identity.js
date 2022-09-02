@@ -20,7 +20,7 @@ const Identity = (props) => {
     <div className="App-identity">
       { !userId && <div>
         <p>
-          <code>Who are you?</code>
+          Who are you?
           <input
             className="inlineInput"
             type="text"
@@ -39,7 +39,7 @@ const Identity = (props) => {
       </div>}
       { userId && <div>
         <p>
-          <code>Welcome, {userId}</code>
+          Welcome, <span className="userName">{userId}</span>
 
           <button
             onClick={() => {
