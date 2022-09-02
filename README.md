@@ -787,3 +787,5 @@ REACT_APP_ARCHITECTURE_VERSION=II REACT_APP_SPAM_MODEL_VERSION=v3 npm start
 ```
 
 Reload `http://localhost:3000` on your browser and enjoy the show.
+
+![sms_app](images/sms_app.png)

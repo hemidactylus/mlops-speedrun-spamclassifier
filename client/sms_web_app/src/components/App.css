@@ -66,6 +66,7 @@
 }
 .spamStatus {
   margin-right: 20px;
+  cursor: default;
 }
 .userName {
   color: gold;
