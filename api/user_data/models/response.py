@@ -29,3 +29,8 @@ class DateRichSMS(SMS):
             date_sent=_date_sent,
             **sms.dict(),
         )
+
+class InsertionSuccess(BaseModel):
+    successful: bool
+    msg: str = ''
+    sms_id: str = None

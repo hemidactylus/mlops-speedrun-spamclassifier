@@ -7,7 +7,7 @@ prepared statements, which are used over and over to optimize the API
 performance.
 """
 
-from api.user_data.utils.models import SMS, DateRichSMS
+from api.user_data.models.response import SMS, DateRichSMS
 
 
 prepared_cache = {}
@@ -45,3 +45,10 @@ def retrieve_smss_by_sms_id(session, user_id):
         DateRichSMS.from_SMS(SMS(**row._asdict()))
         for row in rows
     )
+
+
+def store_sms(session, user_id, sms_id, sender_id, sms_text):
+    insert_cql = 'INSERT INTO smss_by_users (user_id, sms_id, sender_id, sms_text) VALUES (?, ?, ?, ?);'
+    prepared_insert_cql = get_prepared_statement(session, insert_cql)
+    session.execute(prepared_insert_cql, (user_id, sms_id, sender_id, sms_text))
+    return

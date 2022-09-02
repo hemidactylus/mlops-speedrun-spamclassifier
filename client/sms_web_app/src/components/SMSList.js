@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import './App.css';
 
 import SMS from './SMS.js';
+import RefreshList from './RefreshList.js';
 
 import {getMessages} from '../utils/sms_utils.js';
 
@@ -18,13 +19,15 @@ const SMSList = (props) => {
     setFetching(false);
   }
 
-  useEffect(
-    () => {
+  const loadMessages = () => {
       if (userId){
         setFetching(true);
         getMessages(userId, receiveMessages);
       }
-    },
+    };
+
+  useEffect(
+    loadMessages,
     [userId]
   );
 
@@ -39,7 +42,10 @@ const SMSList = (props) => {
       </div>}
       {!fetching && <div>
         { (messageList.length > 0) && <div>
-          <p>Your inbox:</p>
+          <p>
+            <RefreshList reloader={loadMessages}/>
+            Your inbox:
+          </p>
           <ul>
             { messageList.map( msg => (
               <li key={msg.sms_id}>
@@ -52,8 +58,11 @@ const SMSList = (props) => {
           </ul>
         </div>}
         { (messageList.length === 0) && <div>
-          <p>Your inbox is empty :|</p>
-        </div>}        
+          <p>
+            <RefreshList reloader={loadMessages}/>
+            Your inbox is empty :|
+          </p>
+        </div>}
       </div>}
     </div>}
     </div>

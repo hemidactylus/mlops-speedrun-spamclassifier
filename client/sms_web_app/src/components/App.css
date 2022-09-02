@@ -30,13 +30,16 @@
 }
 
 .inlineInput {
+  width: 18vh;
   margin-left: 15px;
   padding-left: 10px;
   font-size: 100%;
   background-color: transparent;
   border: 2px solid #A0FFFF;
   border-radius: 10px;
-  color: #70BFBF;
+  color: gold;
+  font-weight: bold;
+  font-family: Courier;
 }
 
 .inlineButton {
@@ -71,6 +74,11 @@
 
 .headerTitle {
   margin-bottom: 5px;
+}
+
+.reloadButton {
+  margin-right: 8px;
+  cursor: default;
 }
 
 .headerSubtitle {

@@ -38,7 +38,7 @@ const SMS = ({sms}) => {
           <span
             onClick={ () => {
               setSpamStatus('W');
-              checkSpamStatus(sms.sms_text, receiveSpamStatus);
+              checkSpamStatus(sms.sms_text, sms.sms_id, receiveSpamStatus);
             }}
           >{renderSpamStatus(spamStatus)}</span>
         }

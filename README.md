@@ -1,5 +1,13 @@
 # MLOps speedrun: spam classifier
 
+### Introduction
+
+#### Pre-requisites
+
+#### References
+
+#### Notes and caveats
+
 ## Overview
 
 We follow the MLOps story of a company working
@@ -527,7 +535,10 @@ online store up to date:
 feast -c sms_feature_store materialize-incremental 2021-09-02T00:00:00
 ```
 
-The reading script will now find features for both feature services.
+The online sampler script will now find features for both feature services:
+```
+python scripts/online_store_sampler.py sms14050 sms14051 sms14052
+```
 
 _As remarked above, we could content ourselves with a new-message-ingestion
 process that writes to the offline store, and a scheduled materialization
@@ -558,9 +569,9 @@ curl -s -X POST \
             ],
             "entities": {
                 "sms_id": [
-                    'sms14050',
-                    'sms14051',
-                    'sms14052'
+                    "sms14050",
+                    "sms14051",
+                    "sms14052"
                 ]
             }
         }
@@ -575,9 +586,9 @@ curl -s -X POST \
             "feature_service": "labeled_sms_2",
             "entities": {
                 "sms_id": [
-                    'sms14050',
-                    'sms14051',
-                    'sms14052'
+                    "sms14050",
+                    "sms14051",
+                    "sms14052"
                 ]
             }
         }
@@ -613,19 +624,19 @@ to run
 FEAST_STORE_STAGE=2021 feast -c sms_feature_store apply
 ```
 
-Make sure the feature server is restarted (`Ctrl-C` and then re-run
+Make sure the feature server is restarted after this (`Ctrl-C` and then re-run
 the `feast -c sms_feature_store serve` command).
 
 We can now *push new entity rows to the feature store* directly through
 the feature server. The following command will push a newer version
-of the "v2" features for the SMS with `sms_id=14052`, _both to the offline
+of the "v2" features for the SMS with `sms_id='sms14052'`, _both to the offline
 and the online store_:
 
 ```
 curl -X POST "http://localhost:6566/push" -d '{
     "push_source_name": "smss2_push",
     "df": {
-            "sms_id": [14052],
+            "sms_id": ["sms14052"],
             "event_timestamp": ["2021-09-02 00:00:00"],
             "features": [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,65,65,108,2,30]]
     },
@@ -635,7 +646,7 @@ curl -X POST "http://localhost:6566/push" -d '{
 
 Let us check the online store with the script:
 ```
-python scripts/online_store_sampler.py 14052
+python scripts/online_store_sampler.py sms14052
 ```
 and by querying the server:
 ```
@@ -645,7 +656,7 @@ curl -s -X POST \
         {
             "feature_service": "labeled_sms_2",
             "entities": {
-                "sms_id": [14052]
+                "sms_id": ["sms14052"]
             }
         }
       '
@@ -662,21 +673,117 @@ This bypasses the need to run (scheduled or otherwise) an explicit materializati
 > feature values make little sense in
 > themselves. Still, this will be harmless - even if we were to repeat the
 > training step, the point-in-time offline feature retrieval would not fetch
-> this update as its date is beyond its `training_timefreeze`; and the SMS
-> messages from the training set will not be used anywhere else in the app.
+> this update as its date is beyond its `training_timefreeze`; moreover, SMS
+> messages from the _training_ set will not be used anywhere else in the app.
 
 #### App architecture II
 
-It is now time to revise the app and take advantage of the feature server.
+It is now time to revise the app and take advantage of the feature server and the push sources.
 The changes are as follows:
 
-- the "Inbox API", when receiving a new message, will:
+- the newborn "Inbox API", when receiving a new message, will:
+  + write the SMS to the database table for the user-data API: to do that, we add a "write SMS" endpoint to the user-data API itself;
   + contact the model-serving API to get the "v2" features;
   + contact the feature server to push them to the feature store, for later online usage;
-  + write the SMS to the database table for the user-data API: to do that, we add a "write SMS" endpoint to the latter service;
-- the client will ask the feature server for the features of a SMS, based on its `sms_id`.
+- the client will ask the feature server for the features of a SMS, based on its `sms_id`. (_Note: To avoid CORS issues, it is necessary to build a thin proxy between the client and the Feast feature server._)
 - it will then query the `features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
 - (we need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox);
 
+Let's review the changes:
+
 ##### User-data API
 
+The new endpoint works similarly as the existing ones: stop the running API
+with `Ctrl-C` and restart with:
+```
+ARCHITECTURE_VERSION=II uvicorn api.user_data.user_api:app --port 8111
+```
+
+You can now test an insertion with (note that a unique `sms_id` is created automatically):
+```
+curl -XPOST "http://localhost:8111/sms/ellen" \
+  -H 'Content-Type: application/json' \
+  -d  '
+        {
+            "sender_id": "otto",
+            "sms_text": "Can u get me some cabbages at the grocery store?"
+        }
+      '
+```
+
+and then
+```
+curl http://localhost:8111/sms/ellen
+```
+
+##### Inbox API
+
+This is a brand-new, very simple API with a single endpoint.
+Start it with
+```
+uvicorn api.inbox.inbox_api:app --port 8222
+```
+
+and emulate the whole new-SMS insertion process with:
+```
+curl -XPOST "http://localhost:8222/sms" \
+  -H 'Content-Type: application/json' \
+  -d  '
+        {
+            "recipient_id": "otto",
+            "sender_id": "ellen",
+            "sms_text": "They only have turnips left. What do I do?"
+        }
+      '
+```
+
+To check the insertion, you can run
+```
+curl http://localhost:8111/sms/otto
+```
+and then, using the resulting `sms_id`:
+```
+SMS_ID=$(curl -s http://localhost:8111/sms/otto | jq -r '.[0].sms_id')
+python scripts/online_store_sampler.py "$SMS_ID"
+```
+
+The new message appears both in the user-data DB and in the online store.
+
+##### Backfill job
+
+Before declaring back-end victory, there remains to run a backfill job to make
+sure every entry in the user-data table has its feature-store "v2" counterpart.
+
+This is easily done with (note that 'otto' is already covered):
+```
+python scripts/push_v2_features_to_store.py max fiona ellen
+```
+
+Notice that this script also illustrates programmatic (i.e. SDK) usage
+of Feast push source logic, as opposed to sending HTTP requests to
+the feature server.
+
+> You can use the `online_store_sampler.py` script with one of the `sms_id`
+> values you see in the output to try and read its (v2-only) features from the
+> online store.
+
+##### Client
+
+The last step in this architecture upgrade concerns the client. Depending
+on the provided "architecture version" (now set to `II`), a different
+logic is in place to get the spam/ham status of a given message.
+
+First, start a very thin proxy service which simply forwards calls to the
+feature server, put in place so that no CORS issues get in the way. (_Incidentally,
+it is always advisable not to directly connect the feature store and a
+user-facing client._):
+```
+uvicorn api.feature_server_proxy.feature_server_proxy_api:app --port 8999
+```
+
+Finally start the client, instructing it to use the new "real-time" architecture:
+```
+REACT_APP_ARCHITECTURE_VERSION=II REACT_APP_SPAM_MODEL_VERSION=v3 npm start
+```
+
+Reload `http://localhost:3000` on your browser and enjoy the show.
