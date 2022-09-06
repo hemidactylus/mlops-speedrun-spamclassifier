@@ -6,6 +6,17 @@ This repository is a companion to the talk
 "MLOps Speedrun", designed to illustrate some of the
 best practices in dealing with ML tasks in production.
 
+_Highlights:_
+
+- usage of a Feature Store in model-building (training) phase;
+- features/model separation for full architecture modularity;
+- exposing ML models via API (with caching and ready to rate-limiting);
+- versioning of models in the API with minimal code duplication;
+- integration of the Feature Store in the production flow;
+- usage of Push sources and a Feature Server for real-time architecture;
+- microservice architecture & separation of concerns;
+- (prospected) usage of streaming technologies for a full real-time data pipeline;
+
 The main technologies used are [Feast](https://feast.dev/),
 an open-source feature
 store for ML, and [Apache Cassandra™](https://cassandra.apache.org),
@@ -20,20 +31,20 @@ for a realistic (albeit simplified) user-facing application.
 Some understanding and previous knowledge is required (e.g. familiarity
 with Python and notebooks), but we do a pretty good job of guiding
 the reader through all steps in the spirit of a gradual build-up
-up to the final result (it is actually structured as a "story"
-that unfolds step-by-step as the fictional company evolves).
+up to the final result (the README is actually structured as a "story"
+that unfolds step-by-step along with the evolution of a fictional company).
 
 **You should be able to complete all steps in a "tutorial" fashion,
-and end up with the final architecture up and running on your computer.**
+and end up with the final architecture up and running locally, on your computer.**
 
 #### Pre-requisites
 
-- familiarity with a Linux shell such as `bash`
-- Basic knowledge of Python and Jupyter notebooks (the code is all there to run, but you probably want to dissect it a bit)
-- Ability to handle Python requirement files (preferrably in a virtual environment)
-- Elementary knowledge of `git` (at the time of writing, you'll need to clone [Feast](https://github.com/feast-dev/feast) and checkout to a specific version)
-- `curl`, `jq` to easily handle HTTP requests from the command line
-- an [Astra DB instance](https://awesome-astra.github.io/docs/pages/astra/create-instance/), with a [token](https://awesome-astra.github.io/docs/pages/astra/create-token/) and a [secure-connect-bundle](https://awesome-astra.github.io/docs/pages/astra/download-scb/) ready to be used to connect to it
+- familiarity with a Linux shell such as `bash`;
+- Basic knowledge of Python and Jupyter notebooks (the code is all there to run, but you probably want to dissect it a bit);
+- Ability to handle Python requirement files (preferrably in a virtual environment);
+- Elementary knowledge of `git` (at the time of writing, you'll need to clone [Feast](https://github.com/feast-dev/feast) and checkout to a specific version);
+- `curl`, `jq` to easily handle/display HTTP requests from the command line;
+- an [Astra DB instance](https://awesome-astra.github.io/docs/pages/astra/create-instance/), with a [token](https://awesome-astra.github.io/docs/pages/astra/create-token/) and a [secure-connect-bundle](https://awesome-astra.github.io/docs/pages/astra/download-scb/) ready to be used to connect to it.
 
 #### Notes and caveats
 
@@ -46,26 +57,31 @@ There are specific instructions on this in the `requirements.txt` file.
 
 We follow the MLOps story of a company working
 on an application offering a service of spam detection
-for SMS to their users.
+for SMS messages to their users.
 
-The core problem is: creating spam detectors and making them available
+The core task: creating spam detector models, and making them available
 within the application/as APIs. Emphasis on the production (or pseudo-production)
-aspects, more than the accuracy of the ML itself.
+aspects, more than on the accuracy of the ML itself.
 
 We'll follow a fictional year-by-year story arc, as the architecture gets
 progressively refined.
 
+_Note: unless specified, console commands are to be entered from within
+the repo's root directory. You will need several consoles at once to run the
+various services and make them play together nicely._
+
 ## Setup
 
 In order to reproduce all steps yourself, you need to clone this repo,
-create your database instance, and provide some secrets through dot-env
+[create your database instance](https://astra.datastax.com/), and provide some secrets through dot-env
 files and the like. To avoid excessive infrastructure overhead, some
 components will be mocked with local (non-production) equivalents.
 
 - Create a Python 3.8+ virtualenv and `pip install -r requirements.txt` into it.
-- Add the repo's root to the Pythonpath of the virtualenv
-- **TEMP** Take care of installing a certain commit of Feast in development mode, see instructions in `requirements.txt`
-- Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values _(Note: in real life you probably would have run `feast init sms_feature_store -t cassandra` and have followed the interactive procedure)_
+- Add the repo's root to the Pythonpath of the virtualenv.
+- **CURRENTLY** Take care of installing a certain commit of Feast in development mode, see comments in `requirements.txt`.
+- Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values _(Note: in real life you probably would have run `feast init sms_feature_store -t cassandra` and followed the interactive procedure)_.
+- Similarly, copy the `.env.sample` file to `.env` and edit it, inserting the same secrets, keyspace and secure-connect-bundle location you entered in the above feature store configuration file.
 
 ## The story
 
@@ -74,7 +90,7 @@ components will be mocked with local (non-production) equivalents.
 #### Starting data
 
 Our data engineers have collected a labeled set with three columns:
-`sms_id`, `text` and `label`, the latter being simply `spam/ham`. This is in
+`sms_id`, `text` and `label`, the latter being simply a binary `spam/ham`. This is in
 `raw_data/raw_dataset.csv`.
 
 > This dataset could realistically be stored on a database.
@@ -102,8 +118,8 @@ python analysis/features1/feature1_extractor.py \
 
 #### Offline repository for features 1
 
-Our data engineers want to keep all offline data in one place: for this, they
-choose to use Feast. There will be a source for labels, and one for the features.
+Our data engineers want to keep all offline ML-related data in one place: for this, they
+choose to use [Feast](https://feast.dev/). There will be a source for labels, and one for the features.
 The key used to join the two tables will be the SMS id.
 
 > To keep things simple Feast will use the local, file-based offline store,
@@ -123,8 +139,8 @@ python scripts/create_offline_sources_1.py
 Two Parquet files are created in `offline_data/`, one with the labels and
 the other with the features, ready to be used as training set.
 
-All rows in each Parquet file bears the same `event_timestamp`
-(some time in 2019). This is secondary in this case, but would
+All rows in each Parquet file bear the same `event_timestamp`
+(some arbitrary date in 2019). This is secondary in this case, but would
 be relevant if these data did get updated somehow, to allow
 for time-travel-consistency in retrieving historical data.
 
@@ -137,7 +153,7 @@ the right secrets appear in the `sms_feature_store/feature_store.yaml`
 file.
 
 > Copy the template `feature_store.yaml.template`
-> with the right name, and make sure to enter your secrets, bundle file
+> to the right name, and make sure to enter your secrets, bundle file
 > and keyspace name.
 
 Now, with this Feast CLI command,
@@ -150,20 +166,21 @@ found in `sms_feature_store/feature_definitions.py`, and
 in the online store (Astra DB) the tables for each feature view
 will be created (empty for the time being).
 
-> _Note_: we pass an environment variable to Feast commands
-> to emulate the "evolution over time" of the feature-store definitions.
+> _Note_: we pass environment variables to Feast commands
+> (and later to other commands as well) as a way to emulate
+> "evolution over time" of some components of the architecture.
 > In a real application, this should generally not be needed.
 
 #### Training the first model ("2019-model")
 
 Why did we go through this hassle with the feature store?
-One of the reasons is that different teams can share standardized access
-to the features and share them easily.
+One of the reasons is that different teams are granted standardized access
+to the features and the ability to share them easily.
 
 Now, indeed, another team in the company can take these features and train
-the model by retrieving labels and features from the feature store.
+a classifier model by retrieving labels and features from the feature store.
 
-The data scientists can indeed start reading features from the feature
+The data scientists can start reading features from the feature
 store, the set of `sms_id` to use for training, and create the
 "2019" spam-detection model. Since they like to work with interactive notebooks,
 here's what you do:
@@ -172,11 +189,12 @@ here's what you do:
 - locate `training/model1_2019/train_model_1_2019.ipynb`
 - run it all the way to storing the trained model. 
 
-> **Note**: the details of the (rather sketchy) training process are not the focus of this story and will not be examined particularly.
+> **Note**: the details of the (rather sketchy) training process are not the
+> focus of this story and will not be examined in particular depth.
 
 The notebook accesses the Feast store and uses it to retrieve, from offline
 storage, the training data. To do so, the join on `sms_id` is done behind
-the scenes to give a dataset with features _and_ labels. Note we specify
+the scenes, by Feast, to give a dataset with features _and_ labels. Note we specify
 a date, to ensure we retrieve historically-consistent data ("as if time was
 frozen on that day").
 
@@ -186,8 +204,8 @@ for later usage.
 
 > In a production environment, the model would be stored e.g. on cloud object
 > storage; moreover, if the feature registry were not just a local SQLite, this
-> part of the story could well be played on another machine, provided this
-> repo is there with all secrets set up.
+> part of the story could well be played on a separate machine, provided this
+> repo is cloned there, with its secrets set up.
 
 Here is a sketch of the story so far, from the raw data being put into the
 feature store all the way to its retrieval for the training:
@@ -203,8 +221,8 @@ The first is tasked with serving the model. It has endpoints
 to convert a text into features, to convert features into a prediction,
 and one which combines the two and makes a text directly into a prediction.
 
-The API, implemented with FastAPI, is written in a modular way in
-order to serve several versions
+The API, implemented with [FastAPI](https://fastapi.tiangolo.com/), is written in a modular way in
+order to serve, in the future, several versions
 of various models using the same (version-prefixed) endpoint pattern.
 This is achieved by wrapping
 the model (as stored during training) in a specific class, which in turn
@@ -237,26 +255,21 @@ curl -XPOST \
 
 You can also check the auto-generated OpenAPI docs: `http://127.0.0.1:8000/docs`.
 
-Note that in principle this API could be used not only by the front-end (text-to-prediction, presumably), but also by backend services tasked with writing rows to a feature store
-from the raw input SMS text.
-
-TODO:
-
-- cache
-- call log
-- (cache-aware) multiple input endpoint
+Note that in principle this API could be used not only by the front-end
+(i.e. for text-to-prediction, for the time being), but also by
+backend services, e.g. one tasked with writing rows to a feature store
+from the raw input SMS text (which will happen later).
 
 #### The user-data API
 
 The other API, kept as a separate service out of cleanliness,
-will handle the data of our app users. This app is a simple
+will handle the data of our app users. The app (front-end) is a simple
 SMS service, whereby users can visualize their inbox.
 
 > Throughout this demo, of course, security, authentication and other matters
 > are ignored for the sake of simplicity. _Don't do this in production._
 
-The API has endpoints to retrieve the messages stored as belonging to
-(as in "received by") a given
+The API has endpoints to retrieve the messages stored as belonging to a given
 user's inbox (either all of them or one by one by their message ID).
 
 The data is stored on an Astra DB table, with a simple structure: there are
@@ -265,14 +278,15 @@ columns `user_id` (recipient), `sms_id` (a time-ordered unique TIMEUUID),
 with a partitioning that makes it easy to retrieve all messages for a given
 user at once.
 
-> Notes: (1) for more on partitioning in Cassandra and Astra DB, we recommend
+> Notes: (1) for more on partitioning in Cassandra and Astra DB,
+> sadly not the focus of this writeup, we recommend
 > the workshop about ["Data Modeling"](https://github.com/datastaxdevs/workshop-cassandra-data-modeling). (2) In a real production app,
 > mitigation techniques would be put in place to prevent partitions from growing
 > too large (i.e. if a user starts hoarding enormous amounts of messages).
 > (3) Here, for simplicity, we'll keep the table in the same keyspace as the
 > rest of the architecture: such a choice might not be optimal in a real app.
-> (4) User IDs would be better defined as type UUID, but here we wanted to
-> keep things simple.
+> (4) User IDs could be better defined as type UUID, but here we wanted to
+> keep things simple for demonstration purposes.
 
 First provide the Astra DB credentials by copying file `.env.sample` to `.env`
 and filling the required values (much like you did for the feature-store
@@ -307,7 +321,7 @@ curl http://localhost:8111/sms/fiona/32e14000-8400-11e9-aeb7-d19b11ef0c7e
 The Web app is a simple React app where users "login" by entering their name
 and can see their inbox. For each SMS, they can reach the spam-detection API
 and get an assessment on the message text (by clicking on the
-magnifying-glass icons).
+magnifying-glass icon 🔍 next to each message).
 
 To start the client:
 ```
@@ -316,8 +330,8 @@ npm install
 REACT_APP_SPAM_MODEL_VERSION=v1 npm start
 ```
 
-(note that we pass the model version to reach in the Spam API),
-then open `http://localhost:3000/` in the browser.
+(note that we pass the model version for correctly speaking to the
+model-serving API), then open `http://localhost:3000/` in the browser.
 
 >*Tip*: enter `fiona` or `max` as "username", to see some SMS messages.
 
@@ -372,18 +386,20 @@ python scripts/create_offline_sources_2.py
 
 Then a new `FileSource`, `FeatureView` and `FeatureService` are added to `sms_feature_store/feature_definitions.py`
 (check usage of `FEAST_STORE_STAGE`
-there for more details) and finally the updated repository is "applied" again,
+there for more details, as we "emulate" changes in the feature
+definitions by environment variables) and finally the updated repository is "applied" again,
 so that the changes are reflected to both the registry and the online-store
 data structures (viz. Astra DB tables):
 ```
 FEAST_STORE_STAGE=2020 feast -c sms_feature_store apply
 ```
 
-_Note that this time the "features" are a single field in the feature view,
-a field of type `Array(Int64)` in Feast parlance._
+_Note that this time the "features" are a single `Field` in the feature view
+(a field of type `Array(Int64)` in Feast parlance, as opposed to individual
+`Field`s for the "v1" features of 2019)._
 
 Here is a sketch of how, within Feast, the "source", "feature view" and
-"feature service" build one on top of the other in the offline store:
+"feature service" abstractions build one on top of the other in the offline store:
 
 ![03-offline-store](images/mlops_03_offline-store.png)
 
@@ -435,14 +451,18 @@ curl -XPOST \
   -d '{"text": "I have a dream"}'
 ```
 
-Here is a sketch of how the various model version are installed in the FastAPI
+Here is a sketch of how the various model versions are installed in the FastAPI
 application by means of routers generated from a "router factory" function:
 
 ![04-fastapi-routers](images/mlops_04_fastapi-routers.png)
 
+_**Note**: the image shows also the "v3" model, see below. Notice that also
+model "v3" uses the "v2" features: don't let that fool you (in a real-life
+ML company much, much worse can happen 😈 ...)_
+
 #### Client test for "v2"
 
-Provided both API services are running (remember
+Provided both API services are running (remember also the user-data API
 `uvicorn api.user_data.user_api:app --port 8111`), this is simply:
 ```
 REACT_APP_SPAM_MODEL_VERSION=v2 npm start
@@ -466,7 +486,7 @@ In the spirit of this demo, this is also to emphasize the modularity
 of the moving parts at play:
 
 - no need for new elements in the feature store
-- the spam-detection API will have a new "v3" set of endpoints, combining the same feature extractor as "v2" with a new trained model.
+- the spam-detection API will have a new "v3" set of endpoints, combining the same feature extractor as "v2" with a new trained model. To reiterate: model "v3" will use features "v2" exactly like model "v2" (crazy, eh?)
 
 This model will be an improvement over "v2", with a similar architecture (LSTM recurrent neural network
 with slightly different parameters). Training will take place, similarly as before, by running the notebook
@@ -540,25 +560,26 @@ There are plugins to use several databases as online store: as can be seen in
 > case, is that computing the features can be expensive to do in real-time when
 > the user needs them, so we prefer to pre-compute them
 > as soon as the new raw data comes in. Other valid solutions might involve
-> enqueueing their computation, for instance in a Pulsar topic, for consumption
-> as a background asynchronous task. See toward the end for a sketch of such
-> a solution, based on CDC, Astra Streaming and Pulsar functions.
+> enqueueing their computation, for instance in an Apache Pulsar© topic, for consumption
+> as a background asynchronous task. See the end of this writeup for sketches of such
+> solutions, Astra Streaming, Pulsar functions and possibly Astra DB and CDC.
 
 Materialization is invoked with an explicit date parameter: it will consider
 all offline data up to that moment, "as if time stopped at the provided date".
-Imagine your user data (features) change over time, such as a
+_This is not essential here, but imagine for a moment that your user data
+(features) change over time, such as a
 "last 10 items purchased" metric. These, at each user interaction, would be
 accumulated in a time-series fashion (in our case, in the parquet files).
 By scheduling a periodic (incremental) materialization, one makes sure that
 the online store gets updated and contains the latest value for this metric.
 The online store can then be queried to quickly obtain an up-to-date feature
-set, ready for real-time prediction.
+set, ready for real-time prediction._
 
 #### Materialize
 
-We have a tiny script that tries to fetch "v1" and "v2" features from the
-online store, and we'll use it in this section to illustrate what's going on.
-Try running
+We have a tiny "sampler" script that tries to fetch a few "v1" and "v2" features
+from the online store, and we'll use it in this section to illustrate
+what's going on. Try running
 ```
 python scripts/online_store_sampler.py sms14050 sms14051 sms14052
 ```
@@ -657,8 +678,9 @@ make it possible to use Feast as infrastructure for inserting new data into
 the store in real-time.
 
 We'll enable a push source for our "v2" features, with the goal of using
-it to handle the real-time architecture described above with these features
-pre-computed and ready to be used in user-initiated predictions.
+it to handle the real-time architecture outlined above, with the "v2" features
+pre-computed upon SMS ingestion, ready to be then used for
+user-initiated predictions.
 
 We start by altering the feature definitions for the store: until now we had
 the `FileSource` wired to the `FeatureView` through the `source` parameter in the latter
@@ -718,16 +740,17 @@ curl -s -X POST \
 In short:
 
 - the offline store has received a new line in its time-series, with more recent timestamp;
-- in the online store, the entry for that SMS and for features "v2" has been overwritten and is ready to be used.
+- in the online store, the entry for that SMS and for features "v2" has been overwritten and the new values are ready to be used.
 
-This bypasses the need to run (scheduled or otherwise) an explicit materialization step.
+This bypasses the need to run an explicit materialization step (scheduled or otherwise).
 
-> _Note_: This write is just for demonstration purposes: the new
-> feature values make little sense in
+> _Note_: Overwriting the features for this `sms_id` is just for demonstration
+> purposes: the new feature values make little sense in
 > themselves. Still, this will be harmless - even if we were to repeat the
 > training step, the point-in-time offline feature retrieval would not fetch
-> this update as its date is beyond its `training_timefreeze`; moreover, SMS
-> messages from the _training_ set will not be used anywhere else in the app.
+> this update as its date is beyond the `training_timefreeze` used in
+> the training notebook; moreover, incidentally, SMS messages from
+> the _training_ set are not used anywhere else in the app.
 
 Here is a sketch of how the push source extends the "chain" between a (batch)
 source and a feature view in Feast, and how the feature HTTP server can act
@@ -737,16 +760,16 @@ as entry point for insertion of new data in the store:
 
 #### App architecture II
 
-It is now time to revise the app and take advantage of the feature server and the push sources.
-The changes are as follows:
+It is now time to revise the app and take advantage of the Feast
+feature server and the push sources. The changes are as follows:
 
 - the newborn "Inbox API", when receiving a new message, will:
   + write the SMS to the database table for the user-data API: to do that, we add a "write SMS" endpoint to the user-data API itself;
   + contact the model-serving API to get the "v2" features;
-  + contact the feature server to push them to the feature store, for later online usage;
-- the client will ask the feature server for the features of a SMS, based on its `sms_id`. (_Note: To avoid CORS issues, it is necessary to build a thin proxy between the client and the Feast feature server._)
-- it will then query the `features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
-- (we need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox);
+  + contact the feature server to push these "v2" features to the feature store, for later online usage (by model "v3");
+- the client will ask the feature server for the features of an SMS, based on its `sms_id`. (_Note: even just to avoid CORS issues, it is necessary to build a thin proxy between the client and the Feast feature server._)
+- it will then query the `v3/features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
+- (we also need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox at this point);
 
 Here is a sketch of this revised architecture:
 
@@ -756,8 +779,9 @@ Let's review the changes:
 
 ##### User-data API
 
-The new endpoint works similarly as the existing ones: stop the running API
-with `Ctrl-C` and restart with:
+The new endpoint works similarly as the existing ones, i.e. it is a thin wrapper
+around a database write, which makes use of Cassandra driver and ["prepared statements"](https://docs.datastax.com/en/developer/python-driver/3.25/api/cassandra/query/#cassandra.query.PreparedStatement).
+Stop the running API with `Ctrl-C` and restart with:
 ```
 ARCHITECTURE_VERSION=II uvicorn api.user_data.user_api:app --port 8111
 ```
@@ -804,7 +828,7 @@ To check the insertion, you can run
 ```
 curl http://localhost:8111/sms/otto
 ```
-and then, using the resulting `sms_id`:
+and then run the "online store sampler" with the corresponding `sms_id`:
 ```
 SMS_ID=$(curl -s http://localhost:8111/sms/otto | jq -r '.[0].sms_id')
 python scripts/online_store_sampler.py "$SMS_ID"
@@ -824,7 +848,9 @@ python scripts/push_v2_features_to_store.py max fiona ellen
 
 Notice that this script also illustrates programmatic (i.e. SDK) usage
 of Feast push source logic, as opposed to sending HTTP requests to
-the feature server.
+the feature server. _(It also shows that one should always access Cassandra
+tables by partition key - were it necessary to really scan the whole table at
+once, an OLAP solution such as Spark would be advisable on top of Cassandra.)_
 
 > You can use the `online_store_sampler.py` script with one of the `sms_id`
 > values you see in the output to try and read its (v2-only) features from the
@@ -836,7 +862,7 @@ The last step in this architecture upgrade concerns the client. Depending
 on the provided "architecture version" (now set to `II`), a different
 logic is in place to get the spam/ham status of a given message.
 
-First, start a very thin proxy service which simply forwards calls to the
+First, start the (very thin) proxy service which simply forwards calls to the
 feature server, put in place so that no CORS issues get in the way. (_Incidentally,
 it is always advisable not to directly connect the feature store and a
 user-facing client._):
@@ -853,14 +879,46 @@ Reload `http://localhost:3000` on your browser and enjoy the show.
 
 ![sms_app](images/sms_app.png)
 
+> For more fun, you can use the Inbox API to add a new message to your inbox
+> and click the "refresh" (🔄) button on the front-end to make sure the flow
+> is flawless (i.e. the Inbox API has done its job).
+
 ### Chapter 4: what now?
 
-Streaming-based architectures:
+As usually happens, as an architecture grows there are more and more options
+to choose from. Depending on the particular needs, the two ideas sketched below,
+which make use of streaming technologies (as in "event streaming"), may be
+the best solution for a real-time, streamlined backend workflow.
+
+> **Note**: these are not implemented in this tutorial. The reason is that
+> these would work best with the Apache-Pulsar-as-a-service ["Astra Streaming"](https://docs.datastax.com/en/astra-streaming/docs/index.html)
+> (especially the second one, which is tied to Astra DB through the
+> CDC connection); but this requires calling API endpoints from within the "Pulsar
+> functions" (which are executed in the cloud), and we wanted to keep all services
+> running locally on your computer in this demo. You are welcome, of course,
+> to try and provide all relevant moving parts with a public IP and try to implement
+> this architecture. Who knows if in a future upgrade we will provide just that?
 
 #### Streaming topic as entry point
+
+the (push-based) "Inbox API" disappears, replaced by an Astra Streaming (i.e.
+Apache Pulsar) topic where external actors simply push new SMS messages (possibly
+through a thin outward-facing API).
+
+On this topic sits a ["Pulsar function"](https://pulsar.apache.org/docs/functions-overview/) that essentially plays the role
+of the ingest-new-message endpoint that was in the Inbox API, but in a
+"serverless" way. This can (and should) be equipped with a retry-topic to ensure
+everything gets through.
 
 ![07A-streaming-architecture](images/mlops_07A_streaming-architecture.png)
 
 #### Database + CDC to Streaming as entry point
+
+Alternatively, the entry point could be the user-data API itself, exposing
+insertion of a new SMS to external actors. Then, the Streaming topic would be
+automatically populated by the CDC ("change data capture") mechanism, whereby
+a process listening to any change to the `smss_by_users` database table publishes
+them to the topic. In this way the Pulsar function on the streaming topic
+would just have to deal with the feature computation and storage.
 
 ![07B-streaming-cdc-architecture](images/mlops_07B_streaming-cdc-architecture.png)
