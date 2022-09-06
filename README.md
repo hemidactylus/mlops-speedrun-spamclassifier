@@ -2,11 +2,45 @@
 
 ### Introduction
 
+This repository is a companion to the talk
+"MLOps Speedrun", designed to illustrate some of the
+best practices in dealing with ML tasks in production.
+
+The main technologies used are [Feast](https://feast.dev/),
+an open-source feature
+store for ML, and [Apache Cassandra™](https://cassandra.apache.org),
+a NoSQL high-performance database.
+For the latter, in particular, the DB-as-a-service offering
+["Astra DB"](https://astra.datastax.com/)
+by DataStax will be used (free accounts can be created).
+
+The repository, and the instructions in this README, will walk
+through the building of a whole production-grade ML-powered architecture
+for a realistic (albeit simplified) user-facing application.
+Some understanding and previous knowledge is required (e.g. familiarity
+with Python and notebooks), but we do a pretty good job of guiding
+the reader through all steps in the spirit of a gradual build-up
+up to the final result (it is actually structured as a "story"
+that unfolds step-by-step as the fictional company evolves).
+
+**You should be able to complete all steps in a "tutorial" fashion,
+and end up with the final architecture up and running on your computer.**
+
 #### Pre-requisites
 
-#### References
+- familiarity with a Linux shell such as `bash`
+- Basic knowledge of Python and Jupyter notebooks (the code is all there to run, but you probably want to dissect it a bit)
+- Ability to handle Python requirement files (preferrably in a virtual environment)
+- Elementary knowledge of `git` (at the time of writing, you'll need to clone [Feast](https://github.com/feast-dev/feast) and checkout to a specific version)
+- `curl`, `jq` to easily handle HTTP requests from the command line
+- an [Astra DB instance](https://awesome-astra.github.io/docs/pages/astra/create-instance/), with a [token](https://awesome-astra.github.io/docs/pages/astra/create-token/) and a [secure-connect-bundle](https://awesome-astra.github.io/docs/pages/astra/download-scb/) ready to be used to connect to it
 
 #### Notes and caveats
+
+Note that at the time of writing one has to use a pre-release version
+of Feast that already includes the Cassandra/Astra DB integration
+(the integration will be available in a near-future release of Feast).
+There are specific instructions on this in the `requirements.txt` file.
 
 ## Overview
 
