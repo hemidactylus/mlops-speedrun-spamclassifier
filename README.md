@@ -189,6 +189,11 @@ for later usage.
 > part of the story could well be played on another machine, provided this
 > repo is there with all secrets set up.
 
+Here is a sketch of the story so far, from the raw data being put into the
+feature store all the way to its retrieval for the training:
+
+![01-training](images/mlops_01_first-training.png)
+
 #### Serving the model in production (2019)
 
 We are about to launch our first app. In the spirit of microservices,
@@ -316,6 +321,11 @@ then open `http://localhost:3000/` in the browser.
 
 >*Tip*: enter `fiona` or `max` as "username", to see some SMS messages.
 
+Here is a sketch of this first architecture, with the front-end and the
+services it connects to:
+
+![02-architecture-I](images/mlops_02_architecture-I.png)
+
 ### Chapter 2: 2020
 
 #### A new spam model
@@ -372,6 +382,11 @@ FEAST_STORE_STAGE=2020 feast -c sms_feature_store apply
 _Note that this time the "features" are a single field in the feature view,
 a field of type `Array(Int64)` in Feast parlance._
 
+Here is a sketch of how, within Feast, the "source", "feature view" and
+"feature service" build one on top of the other in the offline store:
+
+![03-offline-store](images/mlops_03_offline-store.png)
+
 #### Training the model
 
 It is now time to create the model and train it. This requires devising
@@ -420,6 +435,11 @@ curl -XPOST \
   -d '{"text": "I have a dream"}'
 ```
 
+Here is a sketch of how the various model version are installed in the FastAPI
+application by means of routers generated from a "router factory" function:
+
+![04-fastapi-routers](images/mlops_04_fastapi-routers.png)
+
 #### Client test for "v2"
 
 Provided both API services are running (remember
@@ -427,7 +447,6 @@ Provided both API services are running (remember
 ```
 REACT_APP_SPAM_MODEL_VERSION=v2 npm start
 ```
-
 
 ### Chapter 3: 2021
 
@@ -710,6 +729,12 @@ This bypasses the need to run (scheduled or otherwise) an explicit materializati
 > this update as its date is beyond its `training_timefreeze`; moreover, SMS
 > messages from the _training_ set will not be used anywhere else in the app.
 
+Here is a sketch of how the push source extends the "chain" between a (batch)
+source and a feature view in Feast, and how the feature HTTP server can act
+as entry point for insertion of new data in the store:
+
+![05-push-sources](images/mlops_05_push-sources.png)
+
 #### App architecture II
 
 It is now time to revise the app and take advantage of the feature server and the push sources.
@@ -722,6 +747,10 @@ The changes are as follows:
 - the client will ask the feature server for the features of a SMS, based on its `sms_id`. (_Note: To avoid CORS issues, it is necessary to build a thin proxy between the client and the Feast feature server._)
 - it will then query the `features_to_prediction` endpoint in the model-serving API to get the ham/spam status of a message;
 - (we need a backfill job to prepare the `labeled_sms_2` features for the messages that are already in the inbox);
+
+Here is a sketch of this revised architecture:
+
+![06-architecture-II](images/mlops_06_architecture-II.png)
 
 Let's review the changes:
 
@@ -823,3 +852,15 @@ REACT_APP_ARCHITECTURE_VERSION=II REACT_APP_SPAM_MODEL_VERSION=v3 npm start
 Reload `http://localhost:3000` on your browser and enjoy the show.
 
 ![sms_app](images/sms_app.png)
+
+### Chapter 4: what now?
+
+Streaming-based architectures:
+
+#### Streaming topic as entry point
+
+![07A-streaming-architecture](images/mlops_07A_streaming-architecture.png)
+
+#### Database + CDC to Streaming as entry point
+
+![07B-streaming-cdc-architecture](images/mlops_07B_streaming-cdc-architecture.png)
