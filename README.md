@@ -230,9 +230,16 @@ subclasses a generic `TextClassifierModel` interface; instances of these
 classes, one per model/version, are given to a factory function that creates
 a corresponding FastAPI "router".
 
-**Note**: this API makes an "incidental" use of Astra DB as a cache for
-predictions that were already computed (see below for details). In order
-to set up the cache table, first copy the `.env.sample` file to `.env` and edit the values therein (similarly as the feature store definition yaml file), then run once the script `python scripts/initialize_model_serving_api_caches.py`. If you later see errors such as "Cache-read operation failed. Make sure cache table exists.", chances are you did not run the initialization script.
+**Note**: this API makes a "collateral" use of Astra DB as (1) a cache for
+predictions that were already computed, and (2) to store the log of all
+recent API calls per user (see below for details). In order
+to set up the corresponding tables, first copy the `.env.sample` file to `.env` and
+edit the values therein (similarly as the feature store definition yaml file),
+then run the script `python scripts/initialize_model_serving_api_caches.py`
+just once.
+If you later see errors similar to _"Cache-read operation failed. Make
+sure cache table exists."_, chances are you did not run this
+initialization script.
 
 At this stage, we can only serve model `v1`. To start the API,
 ```
@@ -244,17 +251,17 @@ and to test it you can try:
 curl -XPOST \
   http://localhost:8000/model/v1/text_to_features \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v1/features_to_prediction \
   -H 'Content-Type: application/json' \
-  -d '{"features": [0.09090909090909091,0.0,0,0,0,0,0,0,0]}'
+  -d '{"features": [0.09090909090909091,0.0,0,0,0,0,0,0,0]}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v1/text_to_prediction \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 ```
 
 You can also check the auto-generated OpenAPI docs: `http://127.0.0.1:8000/docs`.
@@ -293,6 +300,30 @@ cache _before_ returning to the caller, but this is not really optimal:
 we could shave off a few milliseconds by scheduling the cache-write _after_
 the response is sent out. To do that, we might make use of FastAPI's
 [background tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/).
+
+#### A note on the "recent call log" (optional reading)
+
+The model-serving API also keeps tracks of each call it receives,
+storing them in a call-log table which can then be inspected
+with a dedicated `/recent_call_log` endpoint.
+
+The log entries are stored to an Astra DB table, with a pre-configured
+time-to-live of one hour (to avoid unbound growth of the row count).
+Of course, the performance
+pros and cons of storing each and every call must be evaluated on a
+case-by-case basis, but this could be a good starting point to implement
+for instance a rate limiter.
+
+At the moment this feature is not used directly in the client: it can
+be tested with the following command (which will return a nonempty list
+provided you ran at least the test invocations given above):
+```
+curl localhost:8000/model/v1/recent_call_log | jq
+```
+
+The same consideration as for the cache holds about the opportunity
+of moving the call-log-write operation to a background task to avoid
+having the caller pay for the (however small) associated extra latency.
 
 #### The user-data API
 
@@ -344,9 +375,9 @@ uvicorn api.user_data.user_api:app --port 8111
 
 You can test it with:
 ```
-curl http://localhost:8111/sms/max
+curl http://localhost:8111/sms/max | jq
 
-curl http://localhost:8111/sms/fiona/32e14000-8400-11e9-aeb7-d19b11ef0c7e
+curl http://localhost:8111/sms/fiona/32e14000-8400-11e9-aeb7-d19b11ef0c7e | jq
 ```
 
 (and see the docs at `http://localhost:8111/docs` as well.)
@@ -471,19 +502,19 @@ and to test the endpoints for the new model:
 curl -XPOST \
   http://localhost:8000/model/v2/text_to_features \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v2/features_to_prediction \
   -H 'Content-Type: application/json' \
   -d '{"features": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
                     0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
-                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}'
+                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v2/text_to_prediction \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 ```
 
 Here is a sketch of how the various model versions are installed in the FastAPI
@@ -543,19 +574,19 @@ and tested with:
 curl -XPOST \
   http://localhost:8000/model/v3/text_to_features \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v3/features_to_prediction \
   -H 'Content-Type: application/json' \
   -d '{"features": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
                     0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
-                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}'
+                    0.0,0.0,0.0,0.0,0.0,1.0,20.0,4.0]}' | jq
 
 curl -XPOST \
   http://localhost:8000/model/v3/text_to_prediction \
   -H 'Content-Type: application/json' \
-  -d '{"text": "I have a dream"}'
+  -d '{"text": "I have a dream"}' | jq
 ```
 
 As for the client, it can be made to point to the new model with:
@@ -684,7 +715,7 @@ curl -s -X POST \
                 ]
             }
         }
-      '
+      ' | jq
 ```
 or directly specifying a feature service:
 ```
@@ -701,7 +732,7 @@ curl -s -X POST \
                 ]
             }
         }
-      '
+      ' | jq
 ```
 
 #### Push sources
@@ -769,7 +800,7 @@ curl -s -X POST \
                 "sms_id": ["sms14052"]
             }
         }
-      '
+      ' | jq
 ```
 
 In short:
@@ -830,12 +861,12 @@ curl -XPOST "http://localhost:8111/sms/ellen" \
             "sender_id": "otto",
             "sms_text": "Can u get me some cabbages at the grocery store?"
         }
-      '
+      ' | jq
 ```
 
 and then
 ```
-curl http://localhost:8111/sms/ellen
+curl http://localhost:8111/sms/ellen | jq
 ```
 
 ##### Inbox API
@@ -856,12 +887,12 @@ curl -XPOST "http://localhost:8222/sms" \
             "sender_id": "ellen",
             "sms_text": "They only have turnips left. What do I do?"
         }
-      '
+      ' | jq
 ```
 
 To check the insertion, you can run
 ```
-curl http://localhost:8111/sms/otto
+curl http://localhost:8111/sms/otto | jq
 ```
 and then run the "online store sampler" with the corresponding `sms_id`:
 ```
