@@ -331,6 +331,13 @@ having the caller pay for the (however small) associated extra latency.
 > or a load-balancer, in which case the API should look for the
 > value of the `X-Forwarded-For` request header.
 
+As a last remark, in case the number of items retrieved by the
+`/recent_call_log` endpoint is expected to be very high, it might be
+unwieldy to first fetch them all and then send them in the request;
+an alternative, leaner approach, based on lazily consuming the rows returned
+by the database query and constructing the response as "Chunked",
+can be seen at work for instance [here](https://github.com/awesome-astra/sample-astra-fastapi-app/blob/main/api.py#L47-L53).
+
 #### The user-data API
 
 The other API, kept as a separate service out of cleanliness,
