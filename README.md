@@ -325,6 +325,12 @@ The same consideration as for the cache holds about the opportunity
 of moving the call-log-write operation to a background task to avoid
 having the caller pay for the (however small) associated extra latency.
 
+> **Note**: the current implementation, moreover, simply reads the
+> request originator's IP address to evaluate the `caller_id` for
+> each call: this would not work as expected when behind a proxy
+> or a load-balancer, in which case the API should look for the
+> value of the `X-Forwarded-For` request header.
+
 #### The user-data API
 
 The other API, kept as a separate service out of cleanliness,
