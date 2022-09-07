@@ -287,6 +287,12 @@ at once): there, to maximize performance, we need to separately treat
 the cached and the novel entries. This problem is solved, for example,
 in the `multiple_text_predictions` endpoint of [this example API](https://github.com/datastaxdevs/workshop-ai-as-api/blob/main/api/main.py).
 
+In this code, for simplicity, we synchronously store the items to the
+cache _before_ returning to the caller, but this is not really optimal:
+we could shave off a few milliseconds by scheduling the cache-write _after_
+the response is sent out. To do that, we might make use of FastAPI's
+[background tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/).
+
 #### The user-data API
 
 The other API, kept as a separate service out of cleanliness,
