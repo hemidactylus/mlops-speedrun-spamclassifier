@@ -2,7 +2,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 
 class FeaturesResult(BaseModel):
+    input: Optional[str]
     features: List[float]
+    from_cache: bool = False
 
 
 class PredictionTopInfo(BaseModel):

@@ -27,7 +27,7 @@ tags_metadata = [
         'name': version,
         'description': 'Model version %s' % version,
     }
-    for version in exposed_model_version_set
+    for version in sorted(exposed_model_version_set)
 ]
 
 app = FastAPI(

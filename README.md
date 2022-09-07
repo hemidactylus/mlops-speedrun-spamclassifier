@@ -230,6 +230,10 @@ subclasses a generic `TextClassifierModel` interface; instances of these
 classes, one per model/version, are given to a factory function that creates
 a corresponding FastAPI "router".
 
+**Note**: this API makes an "incidental" use of Astra DB as a cache for
+predictions that were already computed (see below for details). In order
+to set up the cache table, first copy the `.env.sample` file to `.env` and edit the values therein (similarly as the feature store definition yaml file), then run once the script `python scripts/initialize_model_serving_api_caches.py`. If you later see errors such as "Cache-read operation failed. Make sure cache table exists.", chances are you did not run the initialization script.
+
 At this stage, we can only serve model `v1`. To start the API,
 ```
 SPAM_MODEL_VERSIONS="v1" uvicorn api.model_serving.model_serving_api:app
@@ -260,6 +264,29 @@ Note that in principle this API could be used not only by the front-end
 backend services, e.g. one tasked with writing rows to a feature store
 from the raw input SMS text (which will happen later).
 
+#### A note on caching (optional reading)
+
+The model-serving API, conceptually, has nothing to do with DB storage.
+Still, under the assumption that running a prediction is more expensive than
+a fast database lookup (and assuming deterministic output),
+the API code is equipped with an Astra DB table acting as cache of past calls.
+
+This entails making the database accessible from within this API (hence
+the `.env` setup above), creating a table holding the cached entries (hence
+the initialization script) and adding some logic to the router endpoints.
+
+There is a single table holding cached results from all endpoints, thanks to
+the choice of having model version and endpoint path part of the table
+primary (and partition) key.
+
+At each request, the cache is checked and, if something is found,
+it is returned instead of running the model (or feature extractor)
+and returning the live result. Things get more complicated if we want
+to add endpoints to act on a _list_ of inputs (e.g. several texts
+at once): there, to maximize performance, we need to separately treat
+the cached and the novel entries. This problem is solved, for example,
+in the `multiple_text_predictions` endpoint of [this example API](https://github.com/datastaxdevs/workshop-ai-as-api/blob/main/api/main.py).
+
 #### The user-data API
 
 The other API, kept as a separate service out of cleanliness,
@@ -288,7 +315,8 @@ user at once.
 > (4) User IDs could be better defined as type UUID, but here we wanted to
 > keep things simple for demonstration purposes.
 
-First provide the Astra DB credentials by copying file `.env.sample` to `.env`
+First, if you didn't do it already, provide the Astra DB credentials
+by copying file `.env.sample` to `.env`
 and filling the required values (much like you did for the feature-store
 YAML file above).
 
