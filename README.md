@@ -271,7 +271,7 @@ Still, under the assumption that running a prediction is more expensive than
 a fast database lookup (and assuming deterministic output),
 the API code is equipped with an Astra DB table acting as cache of past calls.
 
-This entails making the database accessible from within this API (hence
+This requires making the database accessible from within this API (hence
 the `.env` setup above), creating a table holding the cached entries (hence
 the initialization script) and adding some logic to the router endpoints.
 
@@ -284,8 +284,9 @@ it is returned instead of running the model (or feature extractor)
 and returning the live result. Things get more complicated if we want
 to add endpoints to act on a _list_ of inputs (e.g. several texts
 at once): there, to maximize performance, we need to separately treat
-the cached and the novel entries. This problem is solved, for example,
-in the `multiple_text_predictions` endpoint of [this example API](https://github.com/datastaxdevs/workshop-ai-as-api/blob/main/api/main.py).
+the cached and the novel entries while feeding the latter to the model at once.
+This problem is solved, for example, in the `multiple_text_predictions`
+endpoint of [this example API](https://github.com/datastaxdevs/workshop-ai-as-api/blob/main/api/main.py).
 
 In this code, for simplicity, we synchronously store the items to the
 cache _before_ returning to the caller, but this is not really optimal:
