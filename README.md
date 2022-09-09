@@ -46,12 +46,11 @@ and end up with the final architecture up and running locally, on your computer.
 - `curl`, `jq` to easily handle/display HTTP requests from the command line;
 - an [Astra DB instance](https://awesome-astra.github.io/docs/pages/astra/create-instance/), with a [token](https://awesome-astra.github.io/docs/pages/astra/create-token/) and a [secure-connect-bundle](https://awesome-astra.github.io/docs/pages/astra/download-scb/) ready to be used to connect to it.
 
-#### Notes and caveats
+#### A caveat on versioning
 
-Note that at the time of writing one has to use a pre-release version
-of Feast that already includes the Cassandra/Astra DB integration
-(the integration will be available in a near-future release of Feast).
-There are specific instructions on this in the `requirements.txt` file.
+🚧 Note that at the moment, for compatibility reasons (between Feast and Tensorflow),
+one has to downgrade `protobuf` _after all other dependencies_ are installed. This
+will be presumably resolved in future releases.
 
 ## Overview
 
@@ -79,7 +78,7 @@ components will be mocked with local (non-production) equivalents.
 
 - Create a Python 3.8+ virtualenv and `pip install -r requirements.txt` into it.
 - Add the repo's root to the Pythonpath of the virtualenv.
-- **CURRENTLY** Take care of installing a certain commit of Feast in development mode, see comments in `requirements.txt`.
+- 🚧 **Current workaround** Manually downgrade `pip install protobuf==3.20.1` (at the moment due to compatibility issues with Tensorflow).
 - Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values _(Note: in real life you probably would have run `feast init sms_feature_store -t cassandra` and followed the interactive procedure)_.
 - Similarly, copy the `.env.sample` file to `.env` and edit it, inserting the same secrets, keyspace and secure-connect-bundle location you entered in the above feature store configuration file.
 
@@ -777,6 +776,13 @@ to run
 ```
 FEAST_STORE_STAGE=2021 feast -c sms_feature_store apply
 ```
+
+> 🚧 Note: release `v0.24.1` of Feast, due to having restricted some requirements
+> on the push sources' behaviour, have made this step impossible. While the
+> exact way around this problem is being investigated, a suggested alternative
+> way would be to `feast teardown` the repo, to clear out any previously-created
+> tables and feature registry, and then re-launch the above command, followed by
+> the `feast materialize` step found above with the highest materialization date.
 
 Make sure the feature server is restarted after this (`Ctrl-C` and then re-run
 the `feast -c sms_feature_store serve` command).

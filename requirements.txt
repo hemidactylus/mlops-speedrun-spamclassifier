@@ -1,5 +1,4 @@
-# + in Feast: pip install -e ".[dev]" on a repo with HEAD detached at feb6cb85 (i.e. just merged the cassandra branch)
-#
+feast[cassandra]==0.24.1
 pandas==1.4.3
 nltk==3.7
 jupyter==1.0.0
@@ -9,4 +8,3 @@ python-dotenv==0.20.0
 uvicorn==0.18.2
 time-uuid==0.2.0
 tensorflow==2.9.1
-# make sure protobuf==3.20.1 comes along
