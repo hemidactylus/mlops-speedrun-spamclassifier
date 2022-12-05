@@ -65,7 +65,7 @@ if 'v2' in exposed_model_version_set:  # expose model v2 2020
     )
     app.include_router(createModelRouter('v2', model_v2))
 
-if 'v2' in exposed_model_version_set:  # expose model v3 2021
+if 'v3' in exposed_model_version_set:  # expose model v3 2021
     #
     from analysis.features2.feature2_extractor import Feature2Extractor
     from api.model_serving.aimodels.KerasLSTMModel import KerasLSTMModel

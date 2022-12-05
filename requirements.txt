@@ -1,4 +1,7 @@
-feast[cassandra]==0.24.1
+# feast[cassandra]==0.27
+# waiting for release this is replaced by:
+git+https://github.com/feast-dev/feast@a0c6fde#egg=feast[cassandra]
+
 pandas==1.4.3
 nltk==3.7
 jupyter==1.0.0

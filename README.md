@@ -2,7 +2,7 @@
 
 ### Introduction
 
-This repository is a companion to the talk
+This repository is a full tutorial/guided tour about
 "MLOps Speedrun", designed to illustrate some of the
 best practices in dealing with ML tasks in production.
 
@@ -10,7 +10,8 @@ _Highlights:_
 
 - usage of a Feature Store in model-building (training) phase;
 - features/model separation for full architecture modularity;
-- exposing ML models via API (with caching and ready to rate-limiting);
+- exposing ML models via API;
+- leveraging a NoSQL distributed DB in the cloud to augment the API with caching and possibly rate limiting;
 - versioning of models in the API with minimal code duplication;
 - integration of the Feature Store in the production flow;
 - usage of Push sources and a Feature Server for real-time architecture;
@@ -24,6 +25,7 @@ a NoSQL high-performance database.
 For the latter, in particular, the DB-as-a-service offering
 ["Astra DB"](https://astra.datastax.com/)
 by DataStax will be used (free accounts can be created).
+The API is created in Python using the [FastAPI](https://fastapi.tiangolo.com/) framework.
 
 The repository, and the instructions in this README, will walk
 through the building of a whole production-grade ML-powered architecture
@@ -31,7 +33,7 @@ for a realistic (albeit simplified) user-facing application.
 Some understanding and previous knowledge is required (e.g. familiarity
 with Python and notebooks), but we do a pretty good job of guiding
 the reader through all steps in the spirit of a gradual build-up
-up to the final result (the README is actually structured as a "story"
+up to the final result (indeed the README is structured as a "story"
 that unfolds step-by-step along with the evolution of a fictional company).
 
 **You should be able to complete all steps in a "tutorial" fashion,
@@ -40,9 +42,9 @@ and end up with the final architecture up and running locally, on your computer.
 #### Pre-requisites
 
 - familiarity with a Linux shell such as `bash`;
-- Basic knowledge of Python and Jupyter notebooks (the code is all there to run, but you probably want to dissect it a bit);
+- Basic knowledge of Python and Jupyter notebooks (the code is all there for you to run, but you probably want to dissect it a bit);
 - Ability to handle Python requirement files (preferrably in a virtual environment);
-- Elementary knowledge of `git` (at the time of writing, you'll need to clone [Feast](https://github.com/feast-dev/feast) and checkout to a specific version);
+- Elementary knowledge of `git` (you currently have to install a "bleeding-edge" build of [Feast](https://github.com/feast-dev/feast) to use all features of the online store plugin -- don't worry, we provide instructions below)
 - `curl`, `jq` to easily handle/display HTTP requests from the command line;
 - an [Astra DB instance](https://awesome-astra.github.io/docs/pages/astra/create-instance/), with a [token](https://awesome-astra.github.io/docs/pages/astra/create-token/) and a [secure-connect-bundle](https://awesome-astra.github.io/docs/pages/astra/download-scb/) ready to be used to connect to it.
 
@@ -77,7 +79,7 @@ files and the like. To avoid excessive infrastructure overhead, some
 components will be mocked with local (non-production) equivalents.
 
 - Create a Python 3.8+ virtualenv and `pip install -r requirements.txt` into it.
-- Add the repo's root to the Pythonpath of the virtualenv.
+- Add the root of this repo to the Pythonpath of the virtualenv.
 - 🚧 **Current workaround** Manually downgrade `pip install protobuf==3.20.1` (at the moment due to compatibility issues with Tensorflow).
 - Copy `sms_feature_store/feature_store.yaml.template` to `sms_feature_store/feature_store.yaml` and replace your Astra DB values _(Note: in real life you probably would have run `feast init sms_feature_store -t cassandra` and followed the interactive procedure)_.
 - Similarly, copy the `.env.sample` file to `.env` and edit it, inserting the same secrets, keyspace and secure-connect-bundle location you entered in the above feature store configuration file.
@@ -151,8 +153,8 @@ we will set Astra DB as the online store. This amounts to making sure
 the right secrets appear in the `sms_feature_store/feature_store.yaml`
 file.
 
-> Copy the template `feature_store.yaml.template`
-> to the right name, and make sure to enter your secrets, bundle file
+> If you haven't already, copy the template `feature_store.yaml.template`
+> to `feature_store.yaml`, and make sure to enter your secrets, bundle file
 > and keyspace name.
 
 Now, with this Feast CLI command,
@@ -222,17 +224,18 @@ and one which combines the two and makes a text directly into a prediction.
 
 The API, implemented with [FastAPI](https://fastapi.tiangolo.com/), is written in a modular way in
 order to serve, in the future, several versions
-of various models using the same (version-prefixed) endpoint pattern.
+of several models using the same (version-prefixed) endpoint pattern.
 This is achieved by wrapping
 the model (as stored during training) in a specific class, which in turn
 subclasses a generic `TextClassifierModel` interface; instances of these
 classes, one per model/version, are given to a factory function that creates
 a corresponding FastAPI "router".
 
-**Note**: this API makes a "collateral" use of Astra DB as (1) a cache for
+**Note**: this API makes a "collateral" use of Astra DB (1) as a cache for
 predictions that were already computed, and (2) to store the log of all
 recent API calls per user (see below for details). In order
-to set up the corresponding tables, first copy the `.env.sample` file to `.env` and
+to set up the corresponding tables, if you haven't done so yet,
+first copy the `.env.sample` file to `.env` and
 edit the values therein (similarly as the feature store definition yaml file),
 then run the script `python scripts/initialize_model_serving_api_caches.py`
 just once.
@@ -304,7 +307,8 @@ the response is sent out. To do that, we might make use of FastAPI's
 
 The model-serving API also keeps tracks of each call it receives,
 storing them in a call-log table which can then be inspected
-with a dedicated `/recent_call_log` endpoint.
+with a dedicated `/recent_call_log` endpoint (**Tip**: look for this endpoint
+in the [auto-generated API docs](http://127.0.0.1:8000/docs)).
 
 The log entries are stored to an Astra DB table, with a pre-configured
 time-to-live of one hour (to avoid unbound growth of the row count).
@@ -343,8 +347,8 @@ The other API, kept as a separate service out of cleanliness,
 will handle the data of our app users. The app (front-end) is a simple
 SMS service, whereby users can visualize their inbox.
 
-> Throughout this demo, of course, security, authentication and other matters
-> are ignored for the sake of simplicity. _Don't do this in production._
+> Throughout this demo, security, authentication and other matters
+> are ignored to better focus on the main topics. _Don't do this in production._
 
 The API has endpoints to retrieve the messages stored as belonging to a given
 user's inbox (either all of them or one by one by their message ID).
@@ -357,12 +361,14 @@ user at once.
 
 > Notes: (1) for more on partitioning in Cassandra and Astra DB,
 > sadly not the focus of this writeup, we recommend
-> the workshop about ["Data Modeling"](https://github.com/datastaxdevs/workshop-cassandra-data-modeling). (2) In a real production app,
+> the workshop about ["Data Modeling"](https://github.com/datastaxdevs/workshop-cassandra-data-modeling).
+> (2) In a real production app,
 > mitigation techniques would be put in place to prevent partitions from growing
 > too large (i.e. if a user starts hoarding enormous amounts of messages).
 > (3) Here, for simplicity, we'll keep the table in the same keyspace as the
 > rest of the architecture: such a choice might not be optimal in a real app.
-> (4) User IDs could be better defined as type UUID, but here we wanted to
+> (4) User IDs could be better defined using the `UUID` Cassandra data type,
+> but here we wanted to
 > keep things simple for demonstration purposes.
 
 First, if you didn't do it already, provide the Astra DB credentials
@@ -439,6 +445,11 @@ python scripts/create_tokenizer_2.py
 to achieve the above. As a result, the tokenizer file (and associated metadata)
 will be created in `models/model2_2020/tokenizer/`.
 
+> _Note_: If you run into an error about `protobuf` having a version mismatch,
+> chances are you forgot to downgrade the package as suggested in the [Setup](#setup)
+> section (this is a temporary workaround that will be addressed in the future).
+> Please do that and try again the above.
+
 As was done for the features "v1", the text-to-features mapping,
 which loads and uses the just-stored tokenizer, is made available as a
 standardized class (compliant with the same generic `FeatureExtractor`
@@ -492,7 +503,7 @@ As usual, this is done in a notebook: running all of
 training/model2_2020/train_model_2_2020.ipynb
 ```
 will result in the model being stored, for later usage, in
-`models/model3_2021/classifier`.
+`models/model2_2020/classifier`.
 
 #### Extending the model-serving API
 
@@ -501,8 +512,10 @@ expose the new model ("v2", i.e. the 2020 model, including its feature
 extractor) all we need to do is to create the `KerasLSTMModel` subclass
 of `TextClassifierModel` and wire it to the API with the dynamic
 FastAPI router factory used already for `"v1"`.
-See file `api/model_serving/aimodels/KerasLSTMModel.py` and
-the `"v2"` part in `api/model_serving/model_serving_api.py`. To start the API with
+Fortunately, this is done already for you:
+see file `api/model_serving/aimodels/KerasLSTMModel.py` and
+the `"v2"` part in `api/model_serving/model_serving_api.py`.
+To start the API with
 both models (`Ctrl-C` it first if still running from earlier):
 ```
 SPAM_MODEL_VERSIONS="v1,v2" uvicorn api.model_serving.model_serving_api:app
@@ -545,6 +558,9 @@ Provided both API services are running (remember also the user-data API
 ```
 REACT_APP_SPAM_MODEL_VERSION=v2 npm start
 ```
+
+(Again, you may have to `Ctrl-C` to stop the running client, re-start it
+and refreshing the app in the browser until it says _Using model version "v2"..._)
 
 ### Chapter 3: 2021
 
@@ -601,11 +617,11 @@ curl -XPOST \
   -d '{"text": "I have a dream"}' | jq
 ```
 
-As for the client, it can be made to point to the new model with:
+As for the client, it can be made to point to the new model with (`Ctrl-C` it first if needed:
 ```
 REACT_APP_SPAM_MODEL_VERSION=v3 npm start
 ```
-(if the user-data API is also running, `uvicorn api.user_data.user_api:app --port 8111`).
+(provided the user-data API is also running: remember `uvicorn api.user_data.user_api:app --port 8111`).
 
 #### Toward real-time
 
@@ -632,7 +648,8 @@ manually invoke the "materialize" operation, which will scan the offline store
 (starting from the last materialization done so far) and transport the data over
 to the online store.
 There are plugins to use several databases as online store: as can be seen in
-`sms_feature_score/feature_store.yaml`, we are using Astra DB.
+`sms_feature_score/feature_store.yaml`, we are using Astra DB through the
+[Cassandra](https://docs.feast.dev/reference/online-stores/cassandra) Feast online store plugin.
 
 > The rationale behind keeping the latest features in the online store, in our
 > case, is that computing the features can be expensive to do in real-time when
@@ -640,7 +657,7 @@ There are plugins to use several databases as online store: as can be seen in
 > as soon as the new raw data comes in. Other valid solutions might involve
 > enqueueing their computation, for instance in an Apache Pulsar© topic, for consumption
 > as a background asynchronous task. See the end of this writeup for sketches of such
-> solutions, Astra Streaming, Pulsar functions and possibly Astra DB and CDC.
+> solutions, build on Astra Streaming, Pulsar functions and possibly Astra DB and CDC.
 
 Materialization is invoked with an explicit date parameter: it will consider
 all offline data up to that moment, "as if time stopped at the provided date".
@@ -671,8 +688,7 @@ and transport them over to the online store:
 ```
 feast -c sms_feature_store materialize 2009-01-01T00:00:00 2019-12-31T00:00:00
 ```
-_(Note: this process is considered an "exceptional" bulk operation; don't worry
-if it takes many tens of minutes!)_
+_(Note that this process may take a few minutes to complete.)_
 
 Running the online sampler script now,
 ```
@@ -776,13 +792,6 @@ to run
 ```
 FEAST_STORE_STAGE=2021 feast -c sms_feature_store apply
 ```
-
-> 🚧 Note: release `v0.24.1` of Feast, due to having restricted some requirements
-> on the push sources' behaviour, have made this step impossible. While the
-> exact way around this problem is being investigated, a suggested alternative
-> way would be to `feast teardown` the repo, to clear out any previously-created
-> tables and feature registry, and then re-launch the above command, followed by
-> the `feast materialize` step found above with the highest materialization date.
 
 Make sure the feature server is restarted after this (`Ctrl-C` and then re-run
 the `feast -c sms_feature_store serve` command).
@@ -919,7 +928,9 @@ SMS_ID=$(curl -s http://localhost:8111/sms/otto | jq -r '.[0].sms_id')
 python scripts/online_store_sampler.py "$SMS_ID"
 ```
 
-The new message appears both in the user-data DB and in the online store.
+The new message appears both in the user-data DB and in the online store
+(in particular, the online store will only have the "features v2"
+number vector for it).
 
 ##### Backfill job
 
