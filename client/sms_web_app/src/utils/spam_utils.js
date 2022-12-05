@@ -3,7 +3,7 @@ import axios from "axios";
 export const model_version = process.env.REACT_APP_SPAM_MODEL_VERSION || 'v1';
 export const architecture_version = process.env.REACT_APP_ARCHITECTURE_VERSION || 'I';
 
-export const checkSpamStatus = (sms_text, sms_id, callback) => {
+export const checkSpamStatus = (sms_text, sms_id, callback, error_callback) => {
   if (architecture_version === 'I') {
     axios.post(
       `http://localhost:8000/model/${model_version}/text_to_prediction`,
@@ -13,6 +13,12 @@ export const checkSpamStatus = (sms_text, sms_id, callback) => {
     )
       .then(response => {
         callback(response.data.top.label);
+      }
+    )
+      .catch(error => {
+        if(error_callback){
+          error_callback();
+        }
       }
     );
   } else if (architecture_version === 'II') {
@@ -37,6 +43,12 @@ export const checkSpamStatus = (sms_text, sms_id, callback) => {
         )
           .then(response => {
             callback(response.data.top.label);
+          }
+        )
+          .catch(error => {
+            if(error_callback){
+              error_callback();
+            }
           }
         );
       }

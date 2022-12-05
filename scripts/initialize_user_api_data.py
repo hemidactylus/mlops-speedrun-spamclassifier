@@ -50,7 +50,7 @@ if __name__ == '__main__':
                 # 2019-06-03
                 '87b4c000-8592-11e9-bff6-20a2e9f40feb',
                 'pete',
-                'You win FREE CASH! Click here!'
+                'Dear winner, please call 800-884433 to retrieve your FREE delivery'
             ),
             (
                 # 2019-06-04
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 # 2019-06-06
                 '06f20000-87ee-11e9-841e-5fa98263a085',
                 'pete',
-                 'You win FREE CASH! Click here!'
+                 'Dear winner, please call 800-884433 to retrieve your FREE delivery'
             ),
         ],
     }

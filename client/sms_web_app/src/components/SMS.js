@@ -17,14 +17,25 @@ const SMS = ({sms}) => {
     }
   };
 
+  const receiveErrorFromSpamService = () => {
+    setSpamStatus('E');
+  }
+
   const renderSpamStatus = (s) => {
     if (s === 'U'){
+      // unknown yet
       return '🔍';
     } else if (s === 'W'){
+      // waiting for response
       return '⏳';
     } else if (s === 'H'){
+      // not spam
       return '✅';
     } else if (s === 'S'){
+      // spam
+      return '🗑️';
+    } else if (s === 'E'){
+      // error from API
       return '❌';
     } else {
       return '?';
@@ -38,7 +49,7 @@ const SMS = ({sms}) => {
           <span
             onClick={ () => {
               setSpamStatus('W');
-              checkSpamStatus(sms.sms_text, sms.sms_id, receiveSpamStatus);
+              checkSpamStatus(sms.sms_text, sms.sms_id, receiveSpamStatus, receiveErrorFromSpamService);
             }}
           >{renderSpamStatus(spamStatus)}</span>
         }

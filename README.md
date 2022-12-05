@@ -978,6 +978,11 @@ Reload `http://localhost:3000` on your browser and enjoy the show.
 > For more fun, you can use the Inbox API to add a new message to your inbox
 > and click the "refresh" (🔄) button on the front-end to make sure the flow
 > is flawless (i.e. the Inbox API has done its job).
+> _Bonus question_: if you add an SMS using the [user-data API](#user-data-api) directly
+> (as opposed to invoking the Inbox),
+> how does the client behave? Why? (... would it be reasonable to provide a
+> working alternate path to the app?)
+
 
 ### Chapter 4: what now?
 
